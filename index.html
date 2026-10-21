@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fff0f5" />
+    <meta name="description" content="A magical Dashain kingdom made with love for Yunisha Karki by her Didi." />
+    <title>Yunisha's Magical Kingdom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Noto+Serif+Devanagari:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body data-world-theme="fairy">
+    <div id="app">
+      <div class="world-wrap" aria-hidden="true">
+        <div id="world-loading" class="world-loading">Preparing your magical world…</div>
+        <canvas id="world-canvas"></canvas>
+        <div class="world-vignette"></div>
+      </div>
+
+      <header class="topbar">
+        <a class="wordmark" href="#" aria-label="Yunisha's Magical World home">
+          <span class="wordmark-star">✦</span> Yunisha's Magical World
+        </a>
+        <div class="topbar-actions">
+          <button id="motion-toggle" class="icon-button" type="button" aria-pressed="false" title="Reduce motion">◌ <span>Motion</span></button>
+          <button id="home-button" class="icon-button" type="button" title="Return to the kingdom">⌂ <span>Kingdom</span></button>
+          <button id="sound-toggle" class="icon-button sound-control" type="button" aria-pressed="false" title="Turn sound effects on">♫ <span>Sound off</span></button>
+          <button id="ambience-toggle" class="icon-button sound-control" type="button" aria-pressed="false" title="Turn ambience on">♪ <span>Ambience off</span></button>
+        </div>
+      </header>
+
+      <!-- PRINCESS ROYAL HUD -->
+      <aside id="princess-hud" class="princess-hud hidden" aria-label="Princess Status and Controls">
+        <div class="hud-profile" title="Princess Yunisha">
+          <div class="hud-avatar">👑</div>
+          <div class="hud-info">
+            <div class="hud-level-row">
+              <span class="hud-badge" id="hud-level-badge">Lvl 1</span>
+              <span class="hud-title" id="hud-royal-title">Little Princess</span>
+            </div>
+            <div class="hud-xp-bar-wrap" title="Princess Experience Points">
+              <div class="hud-xp-bar" id="hud-xp-bar" style="width: 0%"></div>
+            </div>
+            <span class="hud-xp-text" id="hud-xp-text">0 / 100 XP</span>
+          </div>
+        </div>
+
+        <!-- ACTIVE QUEST TRACKER WIDGET -->
+        <button id="quest-tracker-hud" class="quest-tracker-hud" type="button" aria-label="View Active Quest">
+          <div class="tracker-header">
+            <span class="tracker-icon">📜</span>
+            <span class="tracker-label">ACTIVE QUEST</span>
+            <span class="tracker-tag" id="tracker-quest-tag">Quest 1</span>
+          </div>
+          <div class="tracker-title" id="tracker-quest-title">The Whispering Blossom</div>
+          <div class="tracker-progress-row">
+            <span class="tracker-objective" id="tracker-objective">Bloom flowers in garden</span>
+            <span class="tracker-count" id="tracker-count">0/3</span>
+          </div>
+        </button>
+
+        <!-- QUICK ACTION CONTROLS -->
+        <nav class="hud-quick-actions" aria-label="Quick Navigation">
+          <button id="btn-quick-map" class="hud-action-btn" type="button" title="Royal Map (M)" data-open="map">
+            <span class="hud-btn-icon">🗺️</span>
+            <span class="hud-btn-label">Map</span>
+            <kbd>M</kbd>
+          </button>
+          <button id="btn-quick-journal" class="hud-action-btn" type="button" title="Princess Journal (J)" data-open="journal">
+            <span class="hud-btn-icon">📖</span>
+            <span class="hud-btn-label">Journal</span>
+            <kbd>J</kbd>
+          </button>
+          <button id="btn-quick-wardrobe" class="hud-action-btn" type="button" title="Royal Wardrobe (C)" data-open="wardrobe">
+            <span class="hud-btn-icon">👗</span>
+            <span class="hud-btn-label">Wardrobe</span>
+            <kbd>C</kbd>
+          </button>
+          <button id="btn-quick-quests" class="hud-action-btn" type="button" title="Story Quests (Q)" data-open="quests">
+            <span class="hud-btn-icon">📜</span>
+            <span class="hud-btn-label">Quests</span>
+            <kbd>Q</kbd>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- KARI BUTTERFLY COMPANION SPEECH BUBBLE -->
+      <aside id="kari-speech-bubble" class="kari-speech-bubble hidden" aria-live="polite">
+        <div class="kari-bubble-avatar">🦋</div>
+        <div class="kari-bubble-content">
+          <div class="kari-name-row">
+            <strong class="kari-name">Kari the Butterfly</strong>
+            <span class="kari-role">Little Friend</span>
+          </div>
+          <p id="kari-speech-text">Hello, Princess Yunisha! 🦋 I'm Kari, your little magical friend. Shall we explore the kingdom together? ✨</p>
+        </div>
+        <button id="kari-bubble-close" class="kari-bubble-close" type="button" aria-label="Dismiss message">✕</button>
+      </aside>
+
+      <!-- ACHIEVEMENT UNLOCK TOAST QUEUE -->
+      <div id="achievement-toast-container" class="achievement-toast-container" aria-live="assertive"></div>
+
+      <main>
+        <section id="intro" class="intro" aria-labelledby="intro-title">
+          <div class="welcome-floating-decorations" aria-hidden="true">
+            <span class="float-decor float-star-1">✨</span>
+            <span class="float-decor float-heart-1">💖</span>
+            <span class="float-decor float-star-2">⭐</span>
+            <span class="float-decor float-heart-2">💗</span>
+          </div>
+
+          <!-- KARI THE GOLDEN BUTTERFLY (WELCOME SCREEN) -->
+          <div id="welcome-kari-layer" class="welcome-kari-layer">
+            <canvas id="welcome-kari-canvas" class="welcome-kari-canvas"></canvas>
+            <div id="welcome-kari" class="welcome-kari" role="button" tabindex="0" aria-label="Kari the Golden Butterfly">
+              <div class="welcome-kari-butterfly">
+                <div class="welcome-kari-wing welcome-kari-wing-left">
+                  <svg viewBox="0 0 36 32" class="welcome-kari-svg-wing" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="kariGoldWingGradL" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#fff9c4" />
+                        <stop offset="45%" stop-color="#ffd54f" />
+                        <stop offset="85%" stop-color="#ffb300" />
+                        <stop offset="100%" stop-color="#f57f17" />
+                      </linearGradient>
+                      <radialGradient id="kariWingGlowL" cx="60%" cy="40%" r="60%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85" />
+                        <stop offset="50%" stop-color="#ffe082" stop-opacity="0.5" />
+                        <stop offset="100%" stop-color="#ffb300" stop-opacity="0" />
+                      </radialGradient>
+                    </defs>
+                    <path d="M34,16 C30,7 20,2 6,3 C0,3 0,11 10,15 C20,19 32,18 34,16 Z" fill="url(#kariGoldWingGradL)" />
+                    <path d="M34,16 C30,7 20,2 6,3 C0,3 0,11 10,15 C20,19 32,18 34,16 Z" fill="url(#kariWingGlowL)" />
+                    <path d="M32,17 C26,20 18,28 10,30 C4,31 2,24 12,21 C22,18 30,17 32,17 Z" fill="url(#kariGoldWingGradL)" opacity="0.9" />
+                    <path d="M32,16 Q20,10 8,6 M32,16 Q18,14 11,13 M30,18 Q20,23 12,27" stroke="rgba(255,255,255,0.65)" stroke-width="0.8" fill="none" />
+                  </svg>
+                </div>
+                <div class="welcome-kari-body">
+                  <svg viewBox="0 0 14 36" class="welcome-kari-svg-body" aria-hidden="true">
+                    <path d="M5,10 Q2,2 0,3 M9,10 Q12,2 14,3" stroke="#ffd54f" stroke-width="1.2" fill="none" stroke-linecap="round" />
+                    <circle cx="0" cy="3" r="1.2" fill="#fff" />
+                    <circle cx="14" cy="3" r="1.2" fill="#fff" />
+                    <ellipse cx="7" cy="11" rx="2.5" ry="2.5" fill="#ffd54f" />
+                    <ellipse cx="7" cy="16" rx="2.2" ry="3.5" fill="#b26a00" />
+                    <ellipse cx="7" cy="24" rx="1.8" ry="5.5" fill="#783c00" />
+                    <line x1="7" y1="13" x2="7" y2="28" stroke="#ffe082" stroke-width="0.9" stroke-linecap="round" />
+                  </svg>
+                </div>
+                <div class="welcome-kari-wing welcome-kari-wing-right">
+                  <svg viewBox="0 0 36 32" class="welcome-kari-svg-wing" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="kariGoldWingGradR" x1="100%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#fff9c4" />
+                        <stop offset="45%" stop-color="#ffd54f" />
+                        <stop offset="85%" stop-color="#ffb300" />
+                        <stop offset="100%" stop-color="#f57f17" />
+                      </linearGradient>
+                      <radialGradient id="kariWingGlowR" cx="40%" cy="40%" r="60%">
+                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85" />
+                        <stop offset="50%" stop-color="#ffe082" stop-opacity="0.5" />
+                        <stop offset="100%" stop-color="#ffb300" stop-opacity="0" />
+                      </radialGradient>
+                    </defs>
+                    <path d="M2,16 C6,7 16,2 30,3 C36,3 36,11 26,15 C16,19 4,18 2,16 Z" fill="url(#kariGoldWingGradR)" />
+                    <path d="M2,16 C6,7 16,2 30,3 C36,3 36,11 26,15 C16,19 4,18 2,16 Z" fill="url(#kariWingGlowR)" />
+                    <path d="M4,17 C10,20 18,28 26,30 C32,31 34,24 24,21 C14,18 6,17 4,17 Z" fill="url(#kariGoldWingGradR)" opacity="0.9" />
+                    <path d="M4,16 Q16,10 28,6 M4,16 Q18,14 25,13 M6,18 Q16,23 24,27" stroke="rgba(255,255,255,0.65)" stroke-width="0.8" fill="none" />
+                  </svg>
+                </div>
+              </div>
+              <div id="welcome-kari-bubble" class="welcome-kari-bubble hidden" aria-live="polite">
+                <span>Hello, Princess! 🦋</span>
+              </div>
+            </div>
+          </div>
+          <div class="intro-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> A Dashain surprise made with love 💖 <span class="eyebrow-line"></span></p>
+            <p class="intro-story">Somewhere beyond the stars,<br />a magical kingdom was waiting<br />for one very special princess...</p>
+            <h1 id="intro-title">Welcome,<br /><em>Princess Yunisha!</em> 💖</h1>
+            <p class="intro-subtitle">Your magical kingdom is waiting for you.<br />Shall we begin our adventure?</p>
+            <div class="intro-actions">
+              <button id="enter-button" class="button button-gold" type="button" disabled>ENTER THE KINGDOM ✨</button>
+              <button id="skip-intro" class="text-button" type="button">Skip intro <span>→</span></button>
+            </div>
+            <p class="intro-note">A sweet adventure made with love by your Didi 💗</p>
+          </div>
+          <div class="portal" aria-hidden="true"><span></span><i></i></div>
+          <div class="intro-bottom">✦ &nbsp; Follow the gentle lights to find your surprises &nbsp; ✦</div>
+        </section>
+
+        <section id="kingdom" class="kingdom hidden" aria-label="Explore the magical kingdom">
+          <div class="kingdom-heading">
+            <p class="eyebrow">YOUR STORY STARTS HERE 💖</p>
+            <h2>Welcome, Princess Yunisha! 💖</h2>
+            <p>Choose a glowing landmark and see where the magic takes you.</p>
+          </div>
+          <div id="world-prompt" class="world-prompt hidden" aria-live="polite">
+            <button id="world-prompt-btn" type="button" class="world-prompt-btn">
+              <span class="prompt-icon">✨</span>
+              <span id="world-prompt-text">Press E or tap to explore ✨</span>
+              <span class="prompt-key">E</span>
+            </button>
+          </div>
+          <nav class="landmark-grid" aria-label="Magical places">
+            <button class="landmark landmark-castle" data-open="princess">
+              <span class="landmark-icon">♕</span>
+              <span><strong>Princess Castle</strong><small>Royal Hall, Crown Blessing &amp; Magic</small></span>
+              <span class="landmark-pill">Enter</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-garden" data-open="simulations">
+              <span class="landmark-icon">❀</span>
+              <span><strong>Enchanted Garden</strong><small>Blooming Flowers &amp; Floating Petals</small></span>
+              <span class="landmark-pill">Explore</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-gifts" data-open="gifts">
+              <span class="landmark-icon">✧</span>
+              <span><strong>Hall of Gifts</strong><small>Ten Sweet Keepsakes from Didi</small></span>
+              <span class="landmark-pill">10 Gifts</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-memory" data-open="gallery">
+              <span class="landmark-icon">♡</span>
+              <span><strong>Memory Gallery</strong><small>Real Sister &amp; Family Moments</small></span>
+              <span class="landmark-pill">10 Photos</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-festival" data-open="dashain">
+              <span class="landmark-icon">❁</span>
+              <span><strong>Dashain Courtyard</strong><small>Treasure Hunt, Tika &amp; Holy Lights</small></span>
+              <span class="landmark-pill landmark-pill-hunt">Treasure Hunt 🔍</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-stars" data-open="observatory">
+              <span class="landmark-icon">☾</span>
+              <span><strong>Star Observatory</strong><small>Constellation Quest &amp; Wishes</small></span>
+              <span class="landmark-pill">Gaze</span>
+              <b>↗</b>
+            </button>
+            <button class="landmark landmark-video" data-open="videos">
+              <span class="landmark-icon">♫</span>
+              <span><strong>Funny Video Surprise</strong><small>Sweet Smiles &amp; Sister Laughs</small></span>
+              <span class="landmark-pill">2 Clips</span>
+              <b>↗</b>
+            </button>
+          </nav>
+          <div class="kingdom-footer">
+            <button class="text-button" data-open="map">🗺️ Royal Kingdom Map <span>→</span></button>
+            <button class="text-button" data-open="journal">📖 Princess Journal <span>→</span></button>
+            <button class="text-button" data-open="wardrobe">👗 Royal Dressing Room <span>→</span></button>
+            <button class="text-button" data-open="quests">📜 Story Quests <span>→</span></button>
+            <button class="text-button" data-open="letter">💌 Letter from Didi <span>→</span></button>
+            <button class="text-button text-button-secret" data-open="secret">🗝️ Discover Secret Room <span>→</span></button>
+            <button class="text-button" data-open="final">✦ A final little surprise <span>→</span></button>
+            <button class="text-button" data-open="videos">🎬 Funny Videos <span>→</span></button>
+          </div>
+          <p class="explore-hint">WASD or arrow keys to stroll · Shift to run · Space to hop · Approach landmarks or click to explore</p>
+        </section>
+      </main>
+
+      <div id="modal-root"></div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/script.js"></script>
+  </body>
+</html>
