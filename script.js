@@ -170,6 +170,7 @@ const achievementsList = [
   { id: "first_treasure", title: "Dashain Seeker", icon: "🔍", desc: "Uncover your first hidden Dashain treasure." },
   { id: "treasure_master", title: "Master of Dashain Magic", icon: "🏆", desc: "Collect all 3 sacred Dashain treasures." },
   { id: "diya_lighter", title: "Festival of Lights", icon: "🪔", desc: "Light all 5 sacred diyas in the courtyard." },
+  { id: "garland_weaver", title: "Marigold Blossom Weaver", icon: "🌼", desc: "Hang all 3 fragrant marigold garlands in the courtyard." },
   { id: "sister_bond", title: "Cherished Sister", icon: "👭", desc: "Browse family memories and read Didi's letter." },
   { id: "secret_finder", title: "Mystery Unlocked", icon: "🗝️", desc: "Find the Secret Rose Doorway hidden in the kingdom." },
   { id: "style_icon", title: "Fashion Royalty", icon: "👗", desc: "Visit the Royal Wardrobe mirror and try on royal outfits." },
@@ -267,12 +268,12 @@ const storyQuests = [
     desc: "Three golden shooting stars fell into the kingdom! Search the 3D kingdom to find and collect all 3 stars.",
     targetLocation: "map",
     locationName: "Kingdom Grounds",
-    targetCoords: { x: 0, z: 0 },
+    targetCoords: { x: -2.0, z: 4.0 },
     rewardXP: 150,
     rewardReward: "Starry Night Diadem ⭐",
     checkCompleted: () => collectedStars.size >= 3,
-    getProgress: () => ({ current: collectedStars.size, total: 3, label: "Quest stars collected" }),
-    hint: "Kari: Look for golden glowing stars spinning near the bridge, the lake, and the courtyard pathway!"
+    getProgress: () => ({ current: Math.min(collectedStars.size, 3), total: 3, label: "Quest stars caught" }),
+    hint: "Kari: Look for golden glowing stars spinning near the crystal bridge, garden path, and castle lawn!"
   },
   {
     id: "quest_4",
@@ -282,27 +283,42 @@ const storyQuests = [
     desc: "Enter the Dashain Courtyard and uncover the 3 sacred Dashain treasures: Golden Marigold, Sacred Jamara, and Tika Plate.",
     targetLocation: "dashain",
     locationName: "Dashain Courtyard",
-    targetCoords: { x: 0, z: 0 },
+    targetCoords: { x: 0, z: 1.8 },
     rewardXP: 200,
     rewardReward: "Dashain Golden Mukut 👑",
     checkCompleted: () => foundTreasures.size >= 3,
-    getProgress: () => ({ current: foundTreasures.size, total: 3, label: "Dashain treasures found" }),
-    hint: "Kari: Step into the festive courtyard! Search among the flowerbeds, pillars, and blessing table for the 3 sacred items!"
+    getProgress: () => ({ current: Math.min(foundTreasures.size, 3), total: 3, label: "Dashain treasures found" }),
+    hint: "Kari: Step into the festive courtyard! Search among the flowerbeds, earthen pots, and altar for the 3 sacred items!"
   },
   {
     id: "quest_5",
     tag: "Quest 5",
-    title: "Festival of Light & Love",
-    nepali: "उज्यालो पर्व र देवी आशीर्वाद",
-    desc: "Light all 5 courtyard Diyas and hang 3 marigold garlands to prepare the kingdom for Vijaya Dashami.",
+    title: "Festival of Light",
+    nepali: "उज्यालो पर्व र पवित्र दियो",
+    desc: "Light all 5 sacred earthen Diyas in the Dashain Courtyard to illuminate the kingdom for Vijaya Dashami.",
     targetLocation: "dashain",
     locationName: "Dashain Courtyard",
-    targetCoords: { x: 0, z: 0 },
+    targetCoords: { x: 0, z: 2.6 },
+    rewardXP: 200,
+    rewardReward: "Radiant Light Tiara 🪔",
+    checkCompleted: () => litDiyas.size >= 5,
+    getProgress: () => ({ current: Math.min(litDiyas.size, 5), total: 5, label: "Sacred Diyas lit" }),
+    hint: "Kari: Approach the carved stone pedestals in the Dashain Courtyard! Press E to light each sacred flame!"
+  },
+  {
+    id: "quest_6",
+    tag: "Quest 6",
+    title: "Marigold Garland Magic",
+    nepali: "सयपत्री मालाको सुगन्ध",
+    desc: "Hang fragrant orange and yellow marigold garlands with golden bells on the 3 courtyard pillars.",
+    targetLocation: "dashain",
+    locationName: "Dashain Courtyard",
+    targetCoords: { x: 0, z: -1.5 },
     rewardXP: 250,
-    rewardReward: "Grand Festival Finale & Goddess Durga Blessing 🪔",
-    checkCompleted: () => litDiyas.size >= 5 && placedMarigolds.size >= 3,
-    getProgress: () => ({ current: litDiyas.size + placedMarigolds.size, total: 8, label: "Courtyard lights & garlands" }),
-    hint: "Kari: Approach the earthen diyas and marigold posts in the Courtyard! Press E to light the holy flames and hang the garlands!"
+    rewardReward: "Goddess Durga Blessing & Grand Dashain Finale 🌺",
+    checkCompleted: () => placedMarigolds.size >= 3,
+    getProgress: () => ({ current: Math.min(placedMarigolds.size, 3), total: 3, label: "Garlands placed" }),
+    hint: "Kari: Approach the 3 vermilion toran pillars in the courtyard and press E to hang the festive garlands!"
   },
 ];
 
@@ -325,6 +341,9 @@ function updateQuestHUD() {
   if (trackerQuestTitle) trackerQuestTitle.textContent = quest.title;
   if (trackerObjective) trackerObjective.textContent = completed ? "Quest Completed! 🎉" : quest.desc;
   if (trackerCount) trackerCount.textContent = completed ? "✓ DONE" : `${prog.current}/${prog.total}`;
+
+  if (typeof updateQuestGuidePanel === "function") updateQuestGuidePanel();
+  if (typeof updateObjectiveBeacon === "function") updateObjectiveBeacon();
 }
 
 function localAsset(path) {
@@ -465,12 +484,36 @@ function onEnterKingdom() {
   unlockAchievement("first_step");
   updateHUD();
   updateQuestHUD();
+  if (typeof updateControlsVisibility === "function") updateControlsVisibility();
+  if (typeof showTutorialModal === "function") showTutorialModal(false);
   kariSpeak("Hello, Princess Yunisha! 🦋 I'm Kari, your little magical friend. Shall we explore the kingdom together? ✨", 8000);
+}
+
+let isAdventureMode = false;
+
+function setAdventureMode(active) {
+  isAdventureMode = Boolean(active);
+  world?.setAdventureMode(isAdventureMode);
+
+  const btnReturnWelcome = document.getElementById("btn-return-welcome");
+
+  if (isAdventureMode) {
+    kingdom.classList.add("adventure-mode");
+    btnReturnWelcome?.classList.remove("hidden");
+    announce("Entered Adventure Mode! Stroll through the kingdom ✨");
+  } else {
+    kingdom.classList.remove("adventure-mode");
+    btnReturnWelcome?.classList.add("hidden");
+    announce("Returned to Kingdom Cards 🏰");
+  }
+
+  if (typeof updateControlsVisibility === "function") updateControlsVisibility();
 }
 
 function enterWorld(skipAnimation = false) {
   welcomeKari?.pause();
   portalEntered = !skipAnimation;
+  setAdventureMode(false);
   if (!skipAnimation) world?.enterPortal();
   if (skipAnimation) {
     intro.classList.add("hidden");
@@ -495,6 +538,7 @@ function enterWorld(skipAnimation = false) {
 
 function goHome() {
   closeModal();
+  setAdventureMode(false);
   portalEntered = false;
   world?.resetPortal();
   kingdom.classList.add("hidden");
@@ -502,6 +546,7 @@ function goHome() {
   kariSpeechBubble?.classList.add("hidden");
   intro.classList.remove("hidden", "is-leaving");
   welcomeKari?.resume();
+  if (typeof updateControlsVisibility === "function") updateControlsVisibility();
   window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
 }
 
@@ -520,6 +565,7 @@ function modalShell(content, label = "Magical experience") {
   const closeBtn = modalRoot.querySelector(".modal-close");
   closeBtn.focus();
   closeBtn.addEventListener("click", closeModal);
+  if (typeof updateControlsVisibility === "function") updateControlsVisibility();
 }
 
 function closeModal() {
@@ -527,7 +573,7 @@ function closeModal() {
   modalCleanup?.();
   modalCleanup = null;
   modalRoot.innerHTML = "";
-  if (activeWorldTheme === "DASHAIN_WORLD") setWorldTheme("FAIRY_WORLD");
+  if (typeof updateControlsVisibility === "function") updateControlsVisibility();
   if (previousFocus instanceof HTMLElement) previousFocus.focus();
 }
 
@@ -535,9 +581,10 @@ function openModal(name) {
   visitedLandmarks.add(name);
   saveSet("yunisha_visited_landmarks", visitedLandmarks);
 
-  const enteringDashain = name === "dashain";
-  setWorldTheme(enteringDashain ? "DASHAIN_WORLD" : "FAIRY_WORLD");
-  if (enteringDashain) soundManager.play("doorway");
+  if (name === "dashain" && activeWorldTheme !== "DASHAIN_WORLD") {
+    setWorldTheme("DASHAIN_WORLD");
+    soundManager.play("doorway");
+  }
 
   if (name === "secret") unlockAchievement("secret_finder");
   if (name === "letter" && visitedLandmarks.has("gallery")) unlockAchievement("sister_bond");
@@ -573,9 +620,13 @@ function collectWorldStar(id) {
   world?.collectQuestStar(id);
   soundManager.play("sparkle");
   addXP(50, "Collected Quest Star");
-  announce(`Collected a golden Quest Star! ⭐ (${collectedStars.size}/3)`);
-  kariSpeak("You caught a falling star! Look at it sparkle in your hands! ⭐", 6000);
-  if (collectedStars.size >= 3) unlockAchievement("star_seeker");
+  announce(`Golden Star Caught! ⭐ (${collectedStars.size}/3)`);
+  kariSpeak("You caught a golden falling star! Look at it sparkle in your hands! ⭐", 6000);
+  if (collectedStars.size >= 3) {
+    unlockAchievement("star_seeker");
+    addXP(100, "Completed Quest 3: Falling Stars");
+  }
+  checkAdventureFinale();
   updateQuestHUD();
 }
 
@@ -588,8 +639,11 @@ function lightWorldDiya(id) {
   addXP(40, "Lit Sacred Diya");
   announce(`Lit sacred Dashain Diya! 🪔 (${litDiyas.size}/5)`);
   kariSpeak("The holy flame is dancing! May it illuminate your life with joy and peace! 🪔", 6000);
-  if (litDiyas.size >= 5) unlockAchievement("diya_lighter");
-  checkFestivalFinale();
+  if (litDiyas.size >= 5) {
+    unlockAchievement("diya_lighter");
+    addXP(100, "Completed Quest 5: Festival of Light");
+  }
+  checkAdventureFinale();
   updateQuestHUD();
 }
 
@@ -602,7 +656,11 @@ function placeWorldMarigold(id) {
   addXP(40, "Placed Marigold Garland");
   announce(`Hung fragrant Marigold garland! 🌼 (${placedMarigolds.size}/3)`);
   kariSpeak("So beautiful! The courtyard smells like sweet Dashain flowers! 🌼", 6000);
-  checkFestivalFinale();
+  if (placedMarigolds.size >= 3) {
+    unlockAchievement("garland_weaver");
+    addXP(100, "Completed Quest 6: Marigold Garlands");
+  }
+  checkAdventureFinale();
   updateQuestHUD();
 }
 
@@ -628,21 +686,192 @@ function collectWorldTreasure(id) {
   openModal("dashain");
 }
 
-function checkFestivalFinale() {
-  if (litDiyas.size >= 5 && placedMarigolds.size >= 3 && !festivalCelebrated) {
+function checkAdventureFinale() {
+  const starsDone = collectedStars.size >= 3;
+  const diyasDone = litDiyas.size >= 5;
+  const marigoldsDone = placedMarigolds.size >= 3;
+
+  if (starsDone && diyasDone && marigoldsDone && !festivalCelebrated) {
     festivalCelebrated = true;
     localStorage.setItem("yunisha_festival_celebrated", "true");
     soundManager.play("fanfare");
     world?.triggerCelebration("celebration");
-    addXP(250, "Grand Festival of Light");
-    kariSpeak("🌟 GRAND FESTIVAL COMPLETE! All diyas are glowing and marigolds are blooming! Seek the Secret Rose Room for your Goddess Durga blessing! 🪔✨", 10000);
-    announce("Courtyard is radiant with holy light! Grand Festival completed! 🪔");
+    unlockAchievement("treasure_master");
+    unlockAchievement("garland_weaver");
+    addXP(300, "Grand Dashain Quest Finale");
+    announce("🎉 ALL 3 CORE QUESTS COMPLETE! You are the radiant Princess of Dashain! 👑✨");
+    kariSpeak("🌟 WONDERFUL, PRINCESS YUNISHA! You found all 3 falling stars, lit all 5 sacred diyas, and hung the 3 marigold garlands! You make our kingdom shine so bright! Seek the Secret Rose Room for your Goddess Durga blessing! 🪔✨💖", 12000);
   }
+}
+
+// =========================================================================
+// SAFE PLAY AGAIN & RESTART ADVENTURE SYSTEM
+// =========================================================================
+let pendingResetIsFullNewGame = false;
+
+function showRestartConfirmationDialog(isFullReset = false) {
+  pendingResetIsFullNewGame = Boolean(isFullReset);
+  modalShell(`
+    <div class="restart-confirm-card">
+      <div class="restart-confirm-icon">🌟</div>
+      <p class="modal-eyebrow" style="color: #ffd166; letter-spacing: 0.16em;">NEW ADVENTURE ✦ REPLAY MODE</p>
+      <h2 class="restart-confirm-title">Start a new adventure?</h2>
+      <p class="restart-confirm-prompt">
+        Start a new adventure? Your current quest progress will be reset.
+      </p>
+
+      <div class="restart-details-box">
+        <strong style="color: #ffd787; display: block; margin-bottom: 6px;">✨ Quests to replay:</strong>
+        • 5 Sacred Courtyard Diyas (ready to light again 🪔)<br/>
+        • 3 Marigold Garlands (ready to hang on pillars 🌼)<br/>
+        • 3 Falling Golden Stars (return to the kingdom pathways ⭐)<br/>
+        • Quest rewards & Dashain Grand Finale celebration can be earned again! 👑
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 209, 102, 0.18);">
+          <strong style="color: #ffd787; display: block; margin-bottom: 4px;">💖 Safe & Preserved:</strong>
+          • All 10 family photos & sister videos 📷<br/>
+          • Personal Dashain letter & blessings 💌<br/>
+          • Princess dresses, tiaras & Kari's look 👗<br/>
+          • Unrelated achievements and treasures 🏆
+        </div>
+      </div>
+
+      <div class="restart-actions-row">
+        <button id="btn-cancel-restart" class="button secondary-button" type="button" style="padding: 10px 24px; font-size: 0.9rem;">
+          Cancel
+        </button>
+        <button id="btn-confirm-restart" class="button button-gold" type="button" style="padding: 10px 26px; font-size: 0.9rem; font-weight: 700;">
+          Start New Adventure
+        </button>
+      </div>
+    </div>
+  `, "Start New Adventure");
+
+  document.getElementById("btn-cancel-restart")?.addEventListener("click", () => {
+    closeModal();
+  });
+
+  document.getElementById("btn-confirm-restart")?.addEventListener("click", () => {
+    restartAdventureProgress(pendingResetIsFullNewGame);
+  });
+}
+
+function restartAdventureProgress(isFullReset = false) {
+  if (isFullReset) {
+    // 1. Reset all gameplay collections
+    collectedStars.clear();
+    litDiyas.clear();
+    placedMarigolds.clear();
+    foundTreasures.clear();
+    openedGifts.clear();
+    bloomedFlowers.clear();
+    festivalCelebrated = false;
+    wardrobeVisited = false;
+    unlockedAchievements.clear();
+    xp = 0;
+
+    // 2. Persist to storage
+    saveSet("yunisha_collected_stars", collectedStars);
+    saveSet("yunisha_lit_diyas", litDiyas);
+    saveSet("yunisha_placed_marigolds", placedMarigolds);
+    saveSet("yunisha_dashain_treasures", foundTreasures);
+    saveSet("yunisha_opened_gifts", openedGifts);
+    saveSet("yunisha_bloomed_flowers", bloomedFlowers);
+    saveSet("yunisha_achievements", unlockedAchievements);
+    localStorage.removeItem("yunisha_festival_celebrated");
+    localStorage.removeItem("yunisha_wardrobe_visited");
+    localStorage.setItem("yunisha_xp", "0");
+    updateHUD();
+
+    // 3. Restore all 3D world objects
+    world?.resetQuestStars();
+    world?.resetDiyas();
+    world?.resetMarigolds();
+    world?.resetTreasures();
+
+    // 4. Reset active quest to Quest 1
+    activeQuestId = "quest_1";
+    localStorage.setItem("yunisha_active_quest", activeQuestId);
+    updateQuestHUD();
+
+    // 5. Update UI
+    if (typeof updateQuestGuidePanel === "function") updateQuestGuidePanel();
+    if (typeof updateObjectiveBeacon === "function") updateObjectiveBeacon();
+
+    closeModal();
+    soundManager.play("sparkle");
+    announce("✨ A brand new royal adventure has begun! Happy exploring, Princess Yunisha!");
+    kariSpeak("🌟 Welcome to your sparkling new kingdom adventure, Princess Yunisha! Every flower, gift, treasure, and star is waiting for you! Let's go! 💖", 8000);
+    return;
+  }
+  // 1. Calculate XP earned from replayable adventure quests to avoid duplicate XP
+  let adventureXpEarned = 0;
+  // Quest 3: Golden Stars (50 XP each + 100 XP quest completion + 50 XP achievement)
+  adventureXpEarned += collectedStars.size * 50;
+  if (collectedStars.size >= 3) adventureXpEarned += 100;
+  if (unlockedAchievements.has("star_seeker")) adventureXpEarned += 50;
+
+  // Quest 5: Sacred Courtyard Diyas (40 XP each + 100 XP quest completion + 50 XP achievement)
+  adventureXpEarned += litDiyas.size * 40;
+  if (litDiyas.size >= 5) adventureXpEarned += 100;
+  if (unlockedAchievements.has("diya_lighter")) adventureXpEarned += 50;
+
+  // Quest 6: Marigold Garlands (40 XP each + 100 XP quest completion + 50 XP achievement)
+  adventureXpEarned += placedMarigolds.size * 40;
+  if (placedMarigolds.size >= 3) adventureXpEarned += 100;
+  if (unlockedAchievements.has("garland_weaver")) adventureXpEarned += 50;
+
+  // Grand Dashain Finale Celebration (300 XP)
+  if (festivalCelebrated) adventureXpEarned += 300;
+
+  // Safely adjust XP so it can be re-earned without duplication
+  xp = Math.max(0, xp - adventureXpEarned);
+  localStorage.setItem("yunisha_xp", String(xp));
+  updateHUD();
+
+  // 2. Clear quest collection sets
+  collectedStars.clear();
+  litDiyas.clear();
+  placedMarigolds.clear();
+  festivalCelebrated = false;
+
+  // 3. Persist reset states to localStorage
+  saveSet("yunisha_collected_stars", collectedStars);
+  saveSet("yunisha_lit_diyas", litDiyas);
+  saveSet("yunisha_placed_marigolds", placedMarigolds);
+  localStorage.removeItem("yunisha_festival_celebrated");
+
+  // 4. Reset adventure-specific achievements so they can be re-earned
+  unlockedAchievements.delete("star_seeker");
+  unlockedAchievements.delete("diya_lighter");
+  unlockedAchievements.delete("garland_weaver");
+  saveSet("yunisha_achievements", unlockedAchievements);
+
+  // 5. Restore 3D world objects
+  world?.resetQuestStars();
+  world?.resetDiyas();
+  world?.resetMarigolds();
+
+  // 6. Reset active quest to Quest 3
+  activeQuestId = "quest_3";
+  localStorage.setItem("yunisha_active_quest", activeQuestId);
+  updateQuestHUD();
+
+  // 7. Update Adventure Guide panel & beacon
+  if (typeof updateQuestGuidePanel === "function") updateQuestGuidePanel();
+  if (typeof updateObjectiveBeacon === "function") updateObjectiveBeacon();
+
+  // 8. Close modal & celebratory announcement
+  closeModal();
+  soundManager.play("sparkle");
+  announce("✨ A new adventure has begun! Happy exploring, Princess Yunisha!");
+  kariSpeak("🌟 Welcome back to your adventure, Princess Yunisha! The falling stars and holy courtyard are waiting for you once again! Let's go! 💖", 8000);
 }
 
 function handleProximityInteraction(target) {
   if (!target) return;
-  if (target.type === "landmark") {
+  if (target.type === "welcome_cards") {
+    setAdventureMode(false);
+  } else if (target.type === "landmark") {
     openModal(target.id);
   } else if (target.type === "treasure") {
     collectWorldTreasure(target.id);
@@ -656,6 +885,18 @@ function handleProximityInteraction(target) {
     openModal("wardrobe");
   } else if (target.type === "secret_door") {
     openModal("secret");
+  } else if (target.type === "dashain_portal") {
+    setWorldTheme("DASHAIN_WORLD");
+    world?.teleportTo(0, 0.5);
+    soundManager.play("doorway");
+    announce("Entered the Dashain Courtyard! ❁");
+    kariSpeak("Welcome to the Dashain Courtyard! Let's light all 5 sacred diyas and hang the 3 marigold garlands! 🪔🌼", 8000);
+  } else if (target.type === "fairy_portal") {
+    setWorldTheme("FAIRY_WORLD");
+    world?.teleportTo(0, 2.0);
+    soundManager.play("doorway");
+    announce("Returned to Fairy Kingdom! 🏰");
+    kariSpeak("Back in our fairy kingdom! Look at the castle shining in the sunlight! 🌸", 6000);
   }
 }
 
@@ -787,6 +1028,16 @@ function renderQuestsModal() {
                 <button class="secondary-button" type="button" data-quest-hint="${q.id}">
                   Kari's Hint 💡
                 </button>
+                ${!completed && (q.id === "quest_4" || q.id === "quest_5" || q.id === "quest_6") ? `
+                  <button class="secondary-button" type="button" data-quest-goto="${q.id}">
+                    Go to Courtyard 🪔
+                  </button>
+                ` : ""}
+                ${!completed && q.id === "quest_3" ? `
+                  <button class="secondary-button" type="button" data-quest-goto-fairy="${q.id}">
+                    Find Golden Stars ⭐
+                  </button>
+                ` : ""}
                 ${!completed ? `
                   <button class="button button-gold" type="button" data-quest-track="${q.id}">
                     ${isActive ? "Currently Tracking ✓" : "Track Quest ✦"}
@@ -798,7 +1049,21 @@ function renderQuestsModal() {
         `;
       }).join("")}
     </div>
+
+    <div class="quests-replay-banner">
+      <div class="quests-replay-info">
+        <h3 class="quests-replay-title">Ready for a New Adventure? 🌟</h3>
+        <p class="quests-replay-desc">You can safely replay the Golden Stars, Courtyard Diyas, and Marigold Garlands anytime. Your personal photos, videos, letter, wardrobe, and sister memories stay 100% safe!</p>
+      </div>
+      <button id="btn-restart-adventure-modal" class="button button-gold" type="button">
+        🔄 Play Again / Restart Adventure ✨
+      </button>
+    </div>
   `, "Story Quests");
+
+  modalRoot.querySelector("#btn-restart-adventure-modal")?.addEventListener("click", () => {
+    showRestartConfirmationDialog();
+  });
 
   modalRoot.querySelectorAll("[data-quest-hint]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -807,6 +1072,38 @@ function renderQuestsModal() {
         closeModal();
         kariSpeak(q.hint, 8000);
       }
+    });
+  });
+
+  modalRoot.querySelectorAll("[data-quest-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeQuestId = btn.dataset.questGoto;
+      localStorage.setItem("yunisha_active_quest", activeQuestId);
+      updateQuestHUD();
+      closeModal();
+      setWorldTheme("DASHAIN_WORLD");
+      world?.teleportTo(0, 0.5);
+      setAdventureMode(true);
+      soundManager.play("sparkle");
+      announce("Arrived at Dashain Courtyard! 🪔");
+      const q = getActiveQuest();
+      kariSpeak(`Here is our festival courtyard! ${q.hint}`, 8000);
+    });
+  });
+
+  modalRoot.querySelectorAll("[data-quest-goto-fairy]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeQuestId = btn.dataset.questGotoFairy;
+      localStorage.setItem("yunisha_active_quest", activeQuestId);
+      updateQuestHUD();
+      closeModal();
+      if (activeWorldTheme !== "FAIRY_WORLD") setWorldTheme("FAIRY_WORLD");
+      world?.teleportTo(0, 2.5);
+      setAdventureMode(true);
+      soundManager.play("sparkle");
+      announce("Searching for falling stars! ⭐");
+      const q = getActiveQuest();
+      kariSpeak(`Look around the bridge, garden entrance, and castle lawn! ${q.hint}`, 8000);
     });
   });
 
@@ -1049,6 +1346,11 @@ function renderPrincessJournal() {
             `;
           }).join("")}
         </div>
+        <div style="margin-top: 24px; text-align: center;">
+          <button id="btn-journal-new-game" class="button secondary-button" type="button" style="padding: 9px 22px; font-size: 0.8rem; border-radius: 99px;">
+            ✨ Start New Game / Restart All Progress
+          </button>
+        </div>
       `;
     }
 
@@ -1182,6 +1484,10 @@ function renderPrincessJournal() {
     modalRoot.querySelector("#journal-go-wardrobe-btn")?.addEventListener("click", () => {
       closeModal();
       openModal("wardrobe");
+    });
+
+    modalRoot.querySelector("#btn-journal-new-game")?.addEventListener("click", () => {
+      showRestartConfirmationDialog(true);
     });
 
     const wishForm = modalRoot.querySelector("#wishes-form");
@@ -2046,6 +2352,7 @@ function renderDashain() {
           <!-- D. HINTS & DISCOVERY MESSAGES -->
           <div class="hunt-actions-row row-between" style="margin-top:16px;">
             <button class="pill-button" id="hunt-hint-btn" type="button">NEED A HINT? 💡</button>
+            <button class="button button-gold" id="walk-in-3d-courtyard-hunt-btn" type="button">Walk in 3D Courtyard 🏰</button>
             <button class="secondary-button" id="reset-hunt-btn" type="button">Restart Treasure Hunt ↺</button>
           </div>
           <div id="hunt-hint-box" class="soft-panel hidden" style="margin-top:12px;"></div>
@@ -2103,6 +2410,26 @@ function renderDashain() {
         </div>
         <p id="tradition-feedback" class="compliment" style="margin-top:12px;"></p>
 
+        <!-- Quest 5 3D Courtyard Status & Direct Walk Button -->
+        <div class="soft-panel quest5-courtyard-card" style="margin-top:20px; padding:16px 20px; background:rgba(255, 235, 205, 0.15); border:1px solid rgba(255, 209, 102, 0.45); border-radius:14px;">
+          <div class="row row-between" style="gap:14px; flex-wrap:wrap; align-items:center;">
+            <div style="flex:1; min-width:240px;">
+              <span class="modal-eyebrow" style="color:var(--gold-light); font-weight:700;">QUEST 5 · FESTIVAL OF LIGHT &amp; LOVE 🪔</span>
+              <h4 style="margin:4px 0 6px; font-size:1.05rem;">The 5 Sacred Diyas &amp; 3 Marigold Garlands</h4>
+              <p style="margin:0; font-size:0.86rem; color:#fdf3e5; line-height:1.4;">
+                Light all 5 earthen Diyas and hang the 3 fragrant Marigold garlands in the 3D Courtyard!
+                <br/>
+                <span style="display:inline-block; margin-top:4px; font-weight:700; color:#ffeaa7;">
+                  Progress: ${litDiyas.size}/5 Diyas lit &nbsp;•&nbsp; ${placedMarigolds.size}/3 Garlands hung (${litDiyas.size + placedMarigolds.size}/8)
+                </span>
+              </p>
+            </div>
+            <button class="button button-gold" id="teleport-to-3d-courtyard-btn" type="button" style="white-space:nowrap;">
+              Walk in 3D Courtyard 🏰
+            </button>
+          </div>
+        </div>
+
         <figure class="dashain-memory-photo" style="margin-top:24px;">
           <img src="${galleryPhotos[8].src}" alt="${galleryPhotos[8].alt}" loading="lazy" />
           <figcaption>dashain pray.jpeg · A sacred Dashain prayer from our family album</figcaption>
@@ -2147,13 +2474,32 @@ function renderDashain() {
       wireView();
     });
 
-    // Start Hunt button
+    // Start Hunt button — seamlessly enters 3D Dashain Courtyard
     modalRoot.querySelector("#start-treasure-hunt-btn")?.addEventListener("click", () => {
       huntStarted = true;
       soundManager.play("fanfare");
-      viewContainer.innerHTML = renderContent();
-      wireView();
-      announce("Treasure Hunt started! Look for the Marigold, Jamara, and Tika!");
+      closeModal();
+      setWorldTheme("DASHAIN_WORLD");
+      world?.teleportTo(0, 0.5);
+      announce("Treasure Hunt started! Look for the Marigold, Jamara, and Tika! 🔍");
+      kariSpeak("Look around, Princess! Find the 3 Dashain treasures, and explore the 5 sacred diyas and marigolds! ✨", 8000);
+    });
+
+    // Walk in 3D Courtyard buttons
+    modalRoot.querySelector("#walk-in-3d-courtyard-hunt-btn")?.addEventListener("click", () => {
+      closeModal();
+      setWorldTheme("DASHAIN_WORLD");
+      world?.teleportTo(0, 0.5);
+      announce("Exploring 3D Dashain Courtyard! 🏰");
+      kariSpeak("You're in the 3D courtyard! Walk up to each diya, garland post, and treasure, and press E! 🪔🌼", 8000);
+    });
+
+    modalRoot.querySelector("#teleport-to-3d-courtyard-btn")?.addEventListener("click", () => {
+      closeModal();
+      setWorldTheme("DASHAIN_WORLD");
+      world?.teleportTo(0, 0.5);
+      announce("Welcome to the 3D Dashain Courtyard! 🏰");
+      kariSpeak("Here is our festival courtyard! Walk up to each Diya to light it with E, and look for the 3 Marigold pillars! 🪔🌼", 8000);
     });
 
     // Treasure collecting
@@ -2242,6 +2588,10 @@ function renderDashain() {
 
     modalRoot.querySelector("#return-from-hunt-btn")?.addEventListener("click", () => {
       closeModal();
+      setWorldTheme("FAIRY_WORLD");
+      world?.teleportTo(0, 2.0);
+      announce("Returned to Fairy Kingdom! 🏰");
+      kariSpeak("Welcome back to your fairy castle, Princess Yunisha! 💖", 6000);
     });
 
     // Traditions tab listeners — 8 authentic pure-Nepali Dashain blessings preserved verbatim
@@ -3127,7 +3477,13 @@ if (reducedMotion) {
   document.body.classList.add("reduced-motion");
 }
 
-document.getElementById("home-button").addEventListener("click", goHome);
+document.getElementById("home-button").addEventListener("click", () => {
+  if (!kingdom.classList.contains("hidden") && isAdventureMode) {
+    setAdventureMode(false);
+  } else {
+    goHome();
+  }
+});
 document.querySelector(".wordmark").addEventListener("click", (event) => { event.preventDefault(); goHome(); });
 
 const soundToggle = document.getElementById("sound-toggle");
@@ -3191,19 +3547,27 @@ document.addEventListener("keydown", (event) => {
 
   // Keyboard navigation shortcuts (when no modal is open and in kingdom)
   if (!modalRoot.firstElementChild && !kingdom.classList.contains("hidden")) {
-    if (event.key === "m" || event.key === "M") {
+    const key = event.key.toLowerCase();
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+      if (!isAdventureMode) {
+        setAdventureMode(true);
+      }
+    } else if (key === "h") {
+      event.preventDefault();
+      setAdventureMode(false);
+    } else if (key === "m") {
       event.preventDefault();
       openModal("map");
-    } else if (event.key === "j" || event.key === "J") {
+    } else if (key === "j") {
       event.preventDefault();
       openModal("journal");
-    } else if (event.key === "q" || event.key === "Q") {
+    } else if (key === "q") {
       event.preventDefault();
       openModal("quests");
-    } else if (event.key === "c" || event.key === "C") {
+    } else if (key === "c") {
       event.preventDefault();
       openModal("wardrobe");
-    } else if ((event.key === "e" || event.key === "E" || event.key === "Enter") && activeProximityTarget) {
+    } else if ((key === "e" || event.key === "Enter") && activeProximityTarget) {
       event.preventDefault();
       handleProximityInteraction(activeProximityTarget);
     }
@@ -3211,6 +3575,16 @@ document.addEventListener("keydown", (event) => {
 });
 
 questTrackerHud?.addEventListener("click", () => openModal("quests"));
+
+document.getElementById("btn-explore-kingdom")?.addEventListener("click", () => {
+  setAdventureMode(true);
+  soundManager.play("sparkle");
+});
+
+document.getElementById("btn-return-welcome")?.addEventListener("click", () => {
+  setAdventureMode(false);
+  soundManager.play("click");
+});
 
 motionToggle.addEventListener("click", () => {
   reducedMotion = !reducedMotion;
@@ -3226,6 +3600,480 @@ worldPromptBtn?.addEventListener("click", () => {
   if (activeProximityTarget) handleProximityInteraction(activeProximityTarget);
 });
 
+// =========================================================================
+// TOUCH CONTROLS, VIRTUAL JOYSTICK, OBJECTIVE COMPASS & QUEST GUIDE
+// =========================================================================
+const DESKTOP_CONTROLS_HINT = "WASD or arrow keys to stroll · Shift to run · Space to hop · Approach landmarks or click to explore";
+const MOBILE_CONTROLS_HINT = "Use the joystick to move · Tap RUN to run · Tap JUMP to hop · Tap objects to explore";
+
+const isTouchDevice = () => (
+  ('ontouchstart' in window) ||
+  (navigator.maxTouchPoints > 0) ||
+  window.matchMedia('(pointer: coarse)').matches
+);
+
+const exploreHintEl = document.getElementById("explore-hint");
+const mobileControlsEl = document.getElementById("mobile-controls");
+const joystickBaseEl = document.getElementById("joystick-base");
+const joystickKnobEl = document.getElementById("joystick-knob");
+const mobileInteractBtn = document.getElementById("mobile-interact-btn");
+const mobileInteractLabel = document.getElementById("mobile-interact-label");
+const mobileInteractIcon = document.getElementById("mobile-interact-icon");
+const mobileRunBtn = document.getElementById("mobile-run-btn");
+const mobileJumpBtn = document.getElementById("mobile-jump-btn");
+
+const objectiveBeaconEl = document.getElementById("objective-beacon");
+const beaconBtnEl = document.getElementById("beacon-btn");
+const beaconArrowEl = document.getElementById("beacon-arrow");
+const beaconLabelEl = document.getElementById("beacon-label");
+const beaconDistEl = document.getElementById("beacon-dist");
+
+const questGuidePanelEl = document.getElementById("quest-guide-panel");
+const questGuideToggleEl = document.getElementById("quest-guide-toggle");
+const questGuideBodyEl = document.getElementById("quest-guide-body");
+const guideBadgeCountEl = document.getElementById("guide-badge-count");
+const guideStarsValEl = document.getElementById("guide-stars-val");
+const guideDiyasValEl = document.getElementById("guide-diyas-val");
+const guideGarlandsValEl = document.getElementById("guide-garlands-val");
+const guideTreasuresValEl = document.getElementById("guide-treasures-val");
+const guideTaskTextEl = document.getElementById("guide-task-text");
+const guideTaskHintEl = document.getElementById("guide-task-hint");
+const guideAskKariBtn = document.getElementById("guide-ask-kari-btn");
+const guideBeaconToggleBtn = document.getElementById("guide-beacon-toggle-btn");
+const guideHelpBtn = document.getElementById("guide-help-btn");
+
+const tutorialModalEl = document.getElementById("tutorial-modal");
+const tutorialCloseBtn = document.getElementById("tutorial-close-btn");
+const tutorialStartBtn = document.getElementById("tutorial-start-btn");
+
+function updateControlsVisibility() {
+  const inKingdom = !kingdom.classList.contains("hidden");
+  const hasModal = Boolean(modalRoot.firstElementChild);
+  const touch = isTouchDevice();
+
+  if (exploreHintEl) {
+    exploreHintEl.textContent = touch ? MOBILE_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;
+  }
+
+  if (mobileControlsEl) {
+    mobileControlsEl.classList.toggle("hidden", !(inKingdom && !hasModal && touch));
+  }
+
+  if (objectiveBeaconEl) {
+    objectiveBeaconEl.classList.toggle("hidden", !(inKingdom && !hasModal));
+  }
+
+  if (questGuidePanelEl) {
+    questGuidePanelEl.classList.toggle("hidden", !(inKingdom && !hasModal));
+  }
+
+  const btnReturnWelcome = document.getElementById("btn-return-welcome");
+  if (btnReturnWelcome) {
+    btnReturnWelcome.classList.toggle("hidden", !(inKingdom && !hasModal && isAdventureMode));
+  }
+
+  if (inKingdom && !hasModal) {
+    updateObjectiveBeacon();
+    updateQuestGuidePanel();
+  }
+}
+
+function getNearestObjective() {
+  const theme = activeWorldTheme;
+  const princessPos = world?.getPrincessPosition() || { x: 0, z: 0 };
+  const currentQuest = getActiveQuest();
+
+  // 1. If currently tracking Quest 3 (The Missing Falling Stars)
+  if (currentQuest.id === "quest_3" && collectedStars.size < 3) {
+    if (theme === "FAIRY_WORLD") {
+      const stars = [
+        { id: "star_1", x: -2.0, z: 4.0, title: "Crystal Bridge Star ⭐", hint: "Walk along the crystal bridge to catch the golden star! ⭐" },
+        { id: "star_2", x: -7.5, z: 1.5, title: "Garden Entrance Star ⭐", hint: "A golden star is glowing beside the flowers at the Enchanted Garden entrance! 🌸" },
+        { id: "star_3", x: 3.2, z: -2.0, title: "Castle East Lawn Star ⭐", hint: "Look on the east lawn right beside the castle walls for the falling star! ⭐" },
+      ];
+      const uncollected = stars.filter((s) => !collectedStars.has(s.id));
+      if (uncollected.length > 0) {
+        uncollected.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...uncollected[0], type: "star" };
+      }
+    } else {
+      return { id: "fairy_portal", x: 0, z: 6.0, title: "Return to Fairy Kingdom 🏰", hint: "Step through the archway to return to the Fairy Kingdom and find your falling stars! 🏰" };
+    }
+  }
+
+  // 2. If currently tracking Quest 5 (Festival of Light - 5 Diyas)
+  if (currentQuest.id === "quest_5" && litDiyas.size < 5) {
+    if (theme === "DASHAIN_WORLD") {
+      const diyas = [
+        { id: "diya_1", x: -4.8, z: 1.6, title: "Sacred Diya 1 🪔", hint: "Approach the carved stone plinth on the west side of the courtyard to light Diya 1! 🪔" },
+        { id: "diya_2", x: -2.4, z: 2.2, title: "Sacred Diya 2 🪔", hint: "Step up to the second stone plinth and press E to light Diya 2! 🪔" },
+        { id: "diya_3", x: 0.0, z: 2.6, title: "Center Sacred Diya 3 🪔", hint: "Light the central sacred diya right in front of the courtyard steps! 🪔" },
+        { id: "diya_4", x: 2.4, z: 2.2, title: "Sacred Diya 4 🪔", hint: "Approach the fourth diya on the east terrace and light it! 🪔" },
+        { id: "diya_5", x: 4.8, z: 1.6, title: "Sacred Diya 5 🪔", hint: "Light the fifth sacred diya on the far east terrace of the courtyard! 🪔" },
+      ];
+      const unlit = diyas.filter((d) => !litDiyas.has(d.id));
+      if (unlit.length > 0) {
+        unlit.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unlit[0], type: "diya" };
+      }
+    } else {
+      return { id: "dashain_portal", x: 0, z: 5.0, title: "Enter Dashain Courtyard ❁", hint: "Step into the glowing Dashain Gateway south of the castle plaza to light the sacred earthen diyas! 🪔" };
+    }
+  }
+
+  // 3. If currently tracking Quest 6 (Marigold Garland Magic - 3 Pillars)
+  if (currentQuest.id === "quest_6" && placedMarigolds.size < 3) {
+    if (theme === "DASHAIN_WORLD") {
+      const marigolds = [
+        { id: "marigold_1", x: -4.0, z: -1.5, title: "West Toran Pillar 🌼", hint: "Hang a fragrant marigold garland on the carved vermilion pillar on the left! 🌼" },
+        { id: "marigold_2", x: 0.0, z: -3.2, title: "North Altar Pillar 🌼", hint: "Place the holy marigold garland on the central altar mandap pillar! 🌼" },
+        { id: "marigold_3", x: 4.0, z: -1.5, title: "East Toran Pillar 🌼", hint: "Hang the festive marigold garland on the carved vermilion pillar on the right! 🌼" },
+      ];
+      const unplaced = marigolds.filter((m) => !placedMarigolds.has(m.id));
+      if (unplaced.length > 0) {
+        unplaced.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unplaced[0], type: "marigold" };
+      }
+    } else {
+      return { id: "dashain_portal", x: 0, z: 5.0, title: "Enter Dashain Courtyard ❁", hint: "Step into the glowing Dashain Gateway to hang the marigold garlands! 🌼" };
+    }
+  }
+
+  // 4. If currently tracking Quest 4 (Dashain Treasures)
+  if (currentQuest.id === "quest_4" && foundTreasures.size < 3) {
+    if (theme === "DASHAIN_WORLD") {
+      const treasures = [
+        { id: "marigold", x: 5.2, z: 1.8, title: "Golden Marigold 🌼", hint: "Look near the terracotta planter on the east courtyard terrace! 🔍" },
+        { id: "jamara", x: -5.2, z: 1.8, title: "Sacred Jamara 🌿", hint: "Search near the earthen pot on the west courtyard terrace for fresh Jamara! 🔍" },
+        { id: "tika", x: 0.0, z: 4.2, title: "Dashain Tika Plate 🔴", hint: "Approach the carved wooden table near the courtyard entrance for the Tika Plate! 🔍" },
+      ];
+      const unfound = treasures.filter((t) => !foundTreasures.has(t.id));
+      if (unfound.length > 0) {
+        unfound.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unfound[0], type: "treasure" };
+      }
+    } else {
+      return { id: "dashain_portal", x: 0, z: 5.0, title: "Enter Dashain Courtyard ❁", hint: "Step into the Dashain Gateway to find the sacred treasures! 🔍" };
+    }
+  }
+
+  // 5. General Fallbacks based on Realm
+  if (theme === "FAIRY_WORLD") {
+    if (collectedStars.size < 3) {
+      const stars = [
+        { id: "star_1", x: -2.0, z: 4.0, title: "Crystal Bridge Star ⭐", hint: "Follow the crystal bridge towards the castle to find the golden star! ⭐" },
+        { id: "star_2", x: -7.5, z: 1.5, title: "Garden Entrance Star ⭐", hint: "A golden star is glowing beside the flowers at the Enchanted Garden entrance! 🌸" },
+        { id: "star_3", x: 3.2, z: -2.0, title: "Castle East Lawn Star ⭐", hint: "Look on the east lawn right beside the castle walls for the falling star! ⭐" },
+      ];
+      const uncollected = stars.filter((s) => !collectedStars.has(s.id));
+      if (uncollected.length > 0) {
+        uncollected.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...uncollected[0], type: "star" };
+      }
+    }
+    if (litDiyas.size < 5 || placedMarigolds.size < 3 || foundTreasures.size < 3) {
+      return {
+        id: "dashain_portal",
+        x: 0,
+        z: 5.0,
+        title: "Dashain Gateway ❁",
+        hint: "Step into the glowing Dashain Gateway south of the plaza to celebrate the festival! ❁",
+      };
+    }
+    return {
+      id: "princess",
+      x: 0,
+      z: -4.0,
+      title: "Princess Castle 👑",
+      hint: "All golden stars and festival tasks complete! Visit the royal castle or Secret Rose Room for your blessings! 💖",
+    };
+  } else {
+    // DASHAIN_WORLD
+    if (litDiyas.size < 5) {
+      const diyas = [
+        { id: "diya_1", x: -4.8, z: 1.6, title: "Sacred Diya 1 🪔", hint: "Light the sacred diya on the northwest carved stone plinth! 🪔" },
+        { id: "diya_2", x: -2.4, z: 2.2, title: "Sacred Diya 2 🪔", hint: "Light the sacred diya on the north-central stone plinth! 🪔" },
+        { id: "diya_3", x: 0.0, z: 2.6, title: "Center Sacred Diya 3 🪔", hint: "Light the central sacred diya right in front of the courtyard steps! 🪔" },
+        { id: "diya_4", x: 2.4, z: 2.2, title: "Sacred Diya 4 🪔", hint: "Light the sacred diya on the east-central stone plinth! 🪔" },
+        { id: "diya_5", x: 4.8, z: 1.6, title: "Sacred Diya 5 🪔", hint: "Light the sacred diya on the northeast carved stone plinth! 🪔" },
+      ];
+      const unlit = diyas.filter((d) => !litDiyas.has(d.id));
+      if (unlit.length > 0) {
+        unlit.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unlit[0], type: "diya" };
+      }
+    }
+    if (placedMarigolds.size < 3) {
+      const marigolds = [
+        { id: "marigold_1", x: -4.0, z: -1.5, title: "West Toran Pillar 🌼", hint: "Hang a fragrant marigold garland on the carved vermilion pillar on the left! 🌼" },
+        { id: "marigold_2", x: 0.0, z: -3.2, title: "North Altar Pillar 🌼", hint: "Place the holy marigold garland on the central altar mandap pillar! 🌼" },
+        { id: "marigold_3", x: 4.0, z: -1.5, title: "East Toran Pillar 🌼", hint: "Hang the festive marigold garland on the carved vermilion pillar on the right! 🌼" },
+      ];
+      const unplaced = marigolds.filter((m) => !placedMarigolds.has(m.id));
+      if (unplaced.length > 0) {
+        unplaced.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unplaced[0], type: "marigold" };
+      }
+    }
+    if (foundTreasures.size < 3) {
+      const treasures = [
+        { id: "marigold", x: 5.2, z: 1.8, title: "Golden Marigold 🌼", hint: "Look near the terracotta planter on the east courtyard terrace! 🔍" },
+        { id: "jamara", x: -5.2, z: 1.8, title: "Sacred Jamara 🌿", hint: "Search near the earthen pot on the west courtyard terrace for fresh Jamara! 🔍" },
+        { id: "tika", x: 0.0, z: 4.2, title: "Dashain Tika Plate 🔴", hint: "Approach the carved wooden table near the courtyard entrance for the Tika Plate! 🔍" },
+      ];
+      const unfound = treasures.filter((t) => !foundTreasures.has(t.id));
+      if (unfound.length > 0) {
+        unfound.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+        return { ...unfound[0], type: "treasure" };
+      }
+    }
+    return {
+      id: "fairy_portal",
+      x: 0,
+      z: 6.0,
+      title: "Return to Fairy Kingdom 🏰",
+      hint: "All Dashain courtyard tasks are complete and glowing with holy light! Return to the castle! 🌸",
+    };
+  }
+}
+
+function updateObjectiveBeacon() {
+  if (kingdom.classList.contains("hidden") || modalRoot.firstElementChild) {
+    objectiveBeaconEl?.classList.add("hidden");
+    return;
+  }
+  const target = getNearestObjective();
+  if (!target) return;
+
+  const princessPos = world?.getPrincessPosition() || { x: 0, z: 0 };
+  const dx = target.x - princessPos.x;
+  const dz = target.z - princessPos.z;
+  const dist = Math.hypot(dx, dz);
+
+  const angleRad = Math.atan2(dx, -dz);
+  const angleDeg = angleRad * (180 / Math.PI);
+
+  if (beaconArrowEl) beaconArrowEl.style.transform = `rotate(${angleDeg}deg)`;
+  if (beaconLabelEl) beaconLabelEl.textContent = target.title;
+  if (beaconDistEl) {
+    beaconDistEl.textContent = dist < 2.2 ? "Nearby! ✨" : `${Math.round(dist * 2)}m away`;
+  }
+  beaconBtnEl?.classList.toggle("is-near", dist < 2.5);
+}
+
+function askKariCurrentGuidance() {
+  soundManager.play("sparkle");
+  world?.interact("kari_greet");
+  const target = getNearestObjective();
+  if (target && target.hint) {
+    kariSpeak(`🦋 Kari: ${target.hint}`, 7500);
+  } else {
+    kariSpeak("🦋 Kari: You are doing wonderful, Princess Yunisha! Explore the glowing landmarks or check your Adventure Guide!", 7000);
+  }
+}
+
+function updateQuestGuidePanel() {
+  if (guideStarsValEl) guideStarsValEl.textContent = `${collectedStars.size}/3`;
+  if (guideDiyasValEl) guideDiyasValEl.textContent = `${litDiyas.size}/5`;
+  if (guideGarlandsValEl) guideGarlandsValEl.textContent = `${placedMarigolds.size}/3`;
+  if (guideTreasuresValEl) guideTreasuresValEl.textContent = `${foundTreasures.size}/3`;
+
+  const remaining = (3 - collectedStars.size) + (5 - litDiyas.size) + (3 - placedMarigolds.size) + (3 - foundTreasures.size);
+  if (guideBadgeCountEl) {
+    guideBadgeCountEl.textContent = remaining > 0 ? `${remaining} Tasks` : "All Done! 👑";
+  }
+
+  const target = getNearestObjective();
+  if (guideTaskTextEl && target) {
+    guideTaskTextEl.textContent = target.title;
+  }
+  if (guideTaskHintEl && target) {
+    guideTaskHintEl.textContent = `💡 ${target.hint || "Approach the object and tap to interact!"}`;
+  }
+}
+
+function showTutorialModal(force = false) {
+  const seen = localStorage.getItem("yunisha_tutorial_seen");
+  if (!seen || force) {
+    tutorialModalEl?.classList.remove("hidden");
+  }
+}
+
+function hideTutorialModal() {
+  tutorialModalEl?.classList.add("hidden");
+  localStorage.setItem("yunisha_tutorial_seen", "true");
+}
+
+let joystickPointerId = null;
+
+function setupVirtualJoystick() {
+  if (!joystickBaseEl || !joystickKnobEl) return;
+
+  const handleJoystickMove = (e) => {
+    if (joystickPointerId === null || e.pointerId !== joystickPointerId) return;
+    const rect = joystickBaseEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const maxRadius = 40;
+    const dist = Math.hypot(dx, dy);
+    const clampedDist = Math.min(dist, maxRadius);
+    const angle = Math.atan2(dy, dx);
+    const kx = Math.cos(angle) * clampedDist;
+    const ky = Math.sin(angle) * clampedDist;
+
+    joystickKnobEl.style.transform = `translate(${kx}px, ${ky}px)`;
+
+    const nx = kx / maxRadius;
+    const ny = -(ky / maxRadius);
+    if (!isAdventureMode && clampedDist > 6) {
+      setAdventureMode(true);
+    }
+    world?.setJoystick(nx, ny);
+  };
+
+  const handleJoystickUp = (e) => {
+    if (joystickPointerId !== null && e.pointerId === joystickPointerId) {
+      joystickPointerId = null;
+      joystickKnobEl.style.transform = "translate(0, 0)";
+      world?.setJoystick(0, 0);
+    }
+  };
+
+  joystickBaseEl.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    joystickPointerId = e.pointerId;
+    joystickBaseEl.setPointerCapture?.(e.pointerId);
+    handleJoystickMove(e);
+  });
+
+  window.addEventListener("pointermove", handleJoystickMove);
+  window.addEventListener("pointerup", handleJoystickUp);
+  window.addEventListener("pointercancel", handleJoystickUp);
+}
+
+function setupMobileControls() {
+  setupVirtualJoystick();
+
+  if (mobileRunBtn) {
+    let isRunning = false;
+    const startRun = (e) => {
+      e.preventDefault();
+      if (!isAdventureMode) setAdventureMode(true);
+      isRunning = true;
+      world?.setRunning(true);
+      mobileRunBtn.classList.add("is-running");
+    };
+    const endRun = (e) => {
+      e.preventDefault();
+      if (isRunning) {
+        isRunning = false;
+        world?.setRunning(false);
+        mobileRunBtn.classList.remove("is-running");
+      }
+    };
+    mobileRunBtn.addEventListener("pointerdown", startRun);
+    window.addEventListener("pointerup", endRun);
+    window.addEventListener("pointercancel", endRun);
+  }
+
+  if (mobileJumpBtn) {
+    mobileJumpBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (!isAdventureMode) setAdventureMode(true);
+      world?.triggerJump();
+      soundManager.play("sparkle");
+      if (navigator.vibrate) {
+        try { navigator.vibrate(20); } catch {}
+      }
+    });
+  }
+
+  if (mobileInteractBtn) {
+    mobileInteractBtn.addEventListener("click", () => {
+      if (activeProximityTarget) {
+        handleProximityInteraction(activeProximityTarget);
+      }
+    });
+  }
+
+  if (beaconBtnEl) {
+    beaconBtnEl.addEventListener("click", () => {
+      askKariCurrentGuidance();
+    });
+  }
+
+  if (questGuideToggleEl) {
+    questGuideToggleEl.addEventListener("click", () => {
+      const isExpanded = questGuideToggleEl.getAttribute("aria-expanded") === "true";
+      questGuideToggleEl.setAttribute("aria-expanded", String(!isExpanded));
+      questGuideBodyEl?.classList.toggle("hidden", isExpanded);
+    });
+  }
+
+  if (guideAskKariBtn) {
+    guideAskKariBtn.addEventListener("click", () => {
+      askKariCurrentGuidance();
+    });
+  }
+
+  if (guideBeaconToggleBtn) {
+    guideBeaconToggleBtn.addEventListener("click", () => {
+      objectiveBeaconEl?.classList.toggle("hidden");
+      askKariCurrentGuidance();
+    });
+  }
+
+  if (guideHelpBtn) {
+    guideHelpBtn.addEventListener("click", () => {
+      showTutorialModal(true);
+    });
+  }
+
+  const guideRestartBtn = document.getElementById("guide-restart-btn");
+  if (guideRestartBtn) {
+    guideRestartBtn.addEventListener("click", () => {
+      showRestartConfirmationDialog(false);
+    });
+  }
+
+  const guideNewGameBtn = document.getElementById("guide-new-game-btn");
+  if (guideNewGameBtn) {
+    guideNewGameBtn.addEventListener("click", () => {
+      showRestartConfirmationDialog(true);
+    });
+  }
+
+  const footerRestartBtn = document.getElementById("btn-footer-restart");
+  if (footerRestartBtn) {
+    footerRestartBtn.addEventListener("click", () => {
+      showRestartConfirmationDialog();
+    });
+  }
+
+  if (tutorialCloseBtn) {
+    tutorialCloseBtn.addEventListener("click", () => {
+      hideTutorialModal();
+    });
+  }
+
+  if (tutorialStartBtn) {
+    tutorialStartBtn.addEventListener("click", () => {
+      hideTutorialModal();
+      soundManager.play("sparkle");
+    });
+  }
+
+  window.addEventListener("resize", updateControlsVisibility);
+
+  setInterval(() => {
+    if (!kingdom.classList.contains("hidden") && !modalRoot.firstElementChild) {
+      updateObjectiveBeacon();
+    }
+  }, 250);
+}
+
 function useWorldFallback(error) {
   console.warn("3D rendering is unavailable; interactive experiences remain usable.", error);
   document.getElementById("world-canvas").classList.add("hidden");
@@ -3235,6 +4083,24 @@ function useWorldFallback(error) {
 
 import("./world.js").then(({ createWorld }) => {
   world = createWorld(document.getElementById("world-canvas"), useWorldFallback);
+  window.world = world;
+  window.collectWorldStar = collectWorldStar;
+  window.lightWorldDiya = lightWorldDiya;
+  window.placeWorldMarigold = placeWorldMarigold;
+  window.setAdventureMode = setAdventureMode;
+  window.setWorldTheme = setWorldTheme;
+  window.getActiveQuest = getActiveQuest;
+  window.updateQuestHUD = updateQuestHUD;
+  window.storyQuests = storyQuests;
+  window.collectedStars = collectedStars;
+  window.litDiyas = litDiyas;
+  window.placedMarigolds = placedMarigolds;
+  window.foundTreasures = foundTreasures;
+  window.unlockedAchievements = unlockedAchievements;
+  window.isFestivalCelebrated = () => festivalCelebrated;
+  window.setActiveQuestId = (id) => { activeQuestId = id; updateQuestHUD(); };
+  window.showRestartConfirmationDialog = showRestartConfirmationDialog;
+  window.restartAdventureProgress = restartAdventureProgress;
   world.setReducedMotion(reducedMotion);
   if (activeWorldTheme !== "FAIRY_WORLD") world.setTheme(activeWorldTheme);
   if (portalEntered) world.enterPortal();
@@ -3254,13 +4120,24 @@ import("./world.js").then(({ createWorld }) => {
   // Connect Proximity callback to in-world HUD prompt
   world.onProximity((data) => {
     activeProximityTarget = data;
-    if (data && !modalRoot.firstElementChild && !kingdom.classList.contains("hidden")) {
+    const inKingdom = !kingdom.classList.contains("hidden");
+    const noModal = !modalRoot.firstElementChild;
+    if (data && inKingdom && noModal) {
       worldPrompt.classList.remove("hidden");
       worldPromptText.textContent = `Press E or tap to explore: ${data.title}`;
+      if (mobileInteractBtn) {
+        mobileInteractBtn.classList.remove("hidden");
+        mobileInteractLabel.textContent = data.actionLabel || data.title;
+        mobileInteractIcon.textContent = data.icon || "✨";
+      }
     } else {
       worldPrompt?.classList.add("hidden");
+      mobileInteractBtn?.classList.add("hidden");
     }
   });
+
+  setupMobileControls();
+  updateControlsVisibility();
 }).catch((error) => {
   console.error("Could not load the 3D scenery module.", error);
   useWorldFallback(error);

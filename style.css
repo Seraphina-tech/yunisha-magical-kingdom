@@ -19,7 +19,7 @@ button { color: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #f1ce91; outline-offset: 4px; }
 .world-wrap, #world-canvas, .world-vignette { position: fixed; inset: 0; width: 100%; height: 100%; }
 .world-wrap { z-index: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 34%, #44315c 0, #211936 40%, #100b25 76%); }
-#world-canvas { display: block; touch-action: pan-y; }
+#world-canvas { display: block; touch-action: none; }
 .world-vignette { pointer-events: none; background: linear-gradient(180deg, rgba(13, 9, 29, .26), transparent 24%, transparent 62%, rgba(13, 9, 29, .78)), radial-gradient(ellipse, transparent 35%, rgba(10, 7, 22, .34) 100%); }
 .world-loading { position: absolute; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--gold); letter-spacing: .12em; font-size: .76rem; transition: opacity .5s; }
 .world-loading.is-ready { opacity: 0; pointer-events: none; }
@@ -65,11 +65,38 @@ main { position: relative; z-index: 1; min-height: 100vh; }
 .landmark strong { font: 600 .84rem var(--serif); }
 .landmark small { color: #c7b8d0; font-size: .69rem; }
 .landmark > b { align-self: flex-start; color: #d9c49e; font-size: .82rem; font-weight: 400; }
-.kingdom-footer { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 26px; margin-top: 20px; }
-.text-button { border: 0; background: transparent; color: #efdbb9; font: 500 .83rem var(--serif); cursor: pointer; padding: 5px; }
-.text-button:hover { color: white; }
-.text-button span { margin-left: 5px; color: var(--gold); }
-.explore-hint { color: rgba(239, 230, 244, .65); font-size: .65rem; margin: 10px 0 0; }
+.kingdom-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 24px;
+  padding: 0 16px;
+  max-width: 860px;
+}
+.text-button {
+  border: 1px solid rgba(255, 244, 223, .16);
+  background: rgba(23, 16, 43, .45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  color: #efdbb9;
+  font: 500 .82rem var(--serif);
+  cursor: pointer;
+  padding: 7px 16px;
+  transition: transform .2s, border-color .2s, background .2s, color .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.text-button:hover {
+  color: white;
+  background: rgba(87, 60, 93, .55);
+  border-color: var(--gold);
+  transform: translateY(-2px);
+}
+.text-button span { margin-left: 4px; color: var(--gold); }
+.explore-hint { display: none !important; }
 
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 70px 16px 24px; background: rgba(9, 6, 21, .72); backdrop-filter: blur(12px); animation: fade-in .25s both; }
 .modal { position: relative; width: min(900px, 100%); max-height: min(84vh, 840px); overflow-y: auto; border: 1px solid rgba(239, 206, 160, .25); border-radius: 24px; background: radial-gradient(ellipse at 50% 0%, rgba(105, 73, 112, .46), transparent 48%), linear-gradient(145deg, #261d3b, #18132a 72%); box-shadow: 0 25px 100px rgba(0, 0, 0, .45); }
@@ -2663,5 +2690,790 @@ body[data-world-theme="fairy"] .garden-walkthrough-section {
   color: #fff1e6;
   font-size: 1rem;
 }
+
+/* =========================================================================
+   ANDROID MOBILE & LAPTOP CONTROLS, COMPASS BEACON & QUEST GUIDE
+   ========================================================================= */
+
+/* 1. Floating Objective Compass / Beacon */
+.objective-beacon {
+  position: fixed;
+  top: 144px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  pointer-events: auto;
+  animation: float-in 0.4s ease-out both;
+}
+
+.beacon-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 99px;
+  border: 1px solid rgba(246, 211, 145, 0.65);
+  background: rgba(27, 18, 47, 0.88);
+  color: #fff4e0;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 14px rgba(246, 211, 145, 0.25);
+  font-size: 0.78rem;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.beacon-pill:hover {
+  transform: scale(1.04);
+  border-color: #f6d391;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(246, 211, 145, 0.5);
+}
+
+.beacon-arrow {
+  display: inline-block;
+  color: #ffd166;
+  font-size: 0.88rem;
+  line-height: 1;
+  transition: transform 0.12s linear;
+  will-change: transform;
+}
+
+.beacon-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.beacon-dist {
+  background: rgba(246, 211, 145, 0.18);
+  border: 1px solid rgba(246, 211, 145, 0.3);
+  color: #ffd787;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.beacon-pill.is-near {
+  border-color: #ffd166;
+  background: rgba(85, 45, 80, 0.92);
+  box-shadow: 0 0 22px rgba(255, 209, 102, 0.65);
+  animation: beacon-pulse 1.4s infinite alternate;
+}
+
+@keyframes beacon-pulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
+}
+
+/* 2. Collapsible Adventure Quest Guide Panel */
+.quest-guide-panel {
+  position: fixed;
+  top: 144px;
+  right: 24px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 320px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.quest-guide-toggle {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(246, 211, 145, 0.45);
+  background: rgba(28, 19, 48, 0.9);
+  color: #fff4e0;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  font-size: 0.78rem;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.quest-guide-toggle:hover {
+  transform: translateY(-2px);
+  background: rgba(48, 30, 75, 0.95);
+  border-color: rgba(246, 211, 145, 0.75);
+}
+
+.guide-toggle-icon { font-size: 1rem; }
+.guide-toggle-title { font-weight: 600; }
+.guide-badge {
+  background: linear-gradient(135deg, #ffd166, #e39d48);
+  color: #38223a;
+  font-weight: 700;
+  font-size: 0.65rem;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+.guide-chevron {
+  font-size: 0.72rem;
+  color: #f1ce91;
+  transition: transform 0.25s ease;
+}
+.quest-guide-toggle[aria-expanded="true"] .guide-chevron {
+  transform: rotate(180deg);
+}
+
+.quest-guide-body {
+  pointer-events: auto;
+  margin-top: 8px;
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(246, 211, 145, 0.3);
+  background: radial-gradient(circle at 80% 0%, rgba(98, 59, 110, 0.45), transparent 70%), linear-gradient(145deg, rgba(32, 22, 53, 0.95), rgba(18, 12, 33, 0.96));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px);
+  padding: 16px;
+  animation: float-in 0.25s ease-out both;
+}
+
+.guide-header h4 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  color: #ffd787;
+}
+
+.guide-sub {
+  font-size: 0.7rem;
+  color: #cbbad3;
+  display: block;
+  margin: 2px 0 10px;
+}
+
+.guide-counters {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.guide-counter-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(246, 211, 145, 0.15);
+}
+
+.counter-icon { font-size: 1rem; }
+.counter-name {
+  flex: 1;
+  font-size: 0.7rem;
+  color: #e5d7eb;
+}
+.counter-val {
+  font-size: 0.78rem;
+  color: #ffd166;
+  font-weight: 700;
+}
+
+.guide-active-task {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(239, 206, 160, 0.08);
+  border: 1px dashed rgba(246, 211, 145, 0.35);
+  margin-bottom: 12px;
+}
+
+.task-eyebrow {
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: #e8c286;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.task-text {
+  font-size: 0.78rem;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.task-hint {
+  margin-top: 5px;
+  font-size: 0.68rem;
+  color: #f1ddbc;
+  line-height: 1.3;
+}
+
+.guide-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.guide-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(246, 211, 145, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5e8d4;
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+
+.guide-btn:hover {
+  background: rgba(246, 211, 145, 0.2);
+  border-color: rgba(246, 211, 145, 0.5);
+  color: #ffffff;
+}
+
+.guide-btn-kari {
+  background: rgba(255, 209, 102, 0.14);
+  border-color: rgba(255, 209, 102, 0.4);
+  color: #ffd787;
+  font-weight: 600;
+}
+
+/* 3. Touch / Android Virtual Controls Overlay */
+.mobile-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.joystick-zone {
+  position: absolute;
+  bottom: max(26px, env(safe-area-inset-bottom, 26px));
+  left: max(24px, env(safe-area-inset-left, 24px));
+  width: 120px;
+  height: 120px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.joystick-base {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.09) 0%, rgba(55, 36, 78, 0.65) 70%, rgba(26, 17, 43, 0.85) 100%);
+  border: 2px solid rgba(246, 211, 145, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 0 16px rgba(246, 211, 145, 0.15);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.joystick-base:active {
+  cursor: grabbing;
+}
+
+.joystick-knob {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff2d1 0%, #e3b063 60%, #b88235 100%);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(246, 211, 145, 0.5);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.04s ease-out;
+}
+
+.joystick-knob::after {
+  content: "✦";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.82rem;
+  color: #5d3d19;
+  font-weight: 700;
+}
+
+/* Mobile Action Zone (Contextual Interact Button) */
+.mobile-action-zone {
+  position: absolute;
+  bottom: max(130px, calc(env(safe-area-inset-bottom, 26px) + 104px));
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 9;
+}
+
+.mobile-interact-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 26px;
+  min-height: 52px;
+  border-radius: 99px;
+  border: 2px solid #fff3df;
+  background: linear-gradient(135deg, #ffd166 0%, #ff9f1c 100%);
+  color: #38223a;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(255, 159, 28, 0.55), 0 0 20px rgba(255, 209, 102, 0.6);
+  backdrop-filter: blur(12px);
+  animation: interact-pop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) both, interact-glow 2s infinite ease-in-out;
+  touch-action: manipulation;
+}
+
+.mobile-interact-btn:active {
+  transform: scale(0.95);
+}
+
+.mobile-interact-icon {
+  font-size: 1.35rem;
+}
+
+@keyframes interact-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes interact-glow {
+  0%, 100% { box-shadow: 0 8px 30px rgba(255, 159, 28, 0.55), 0 0 20px rgba(255, 209, 102, 0.6); }
+  50% { box-shadow: 0 10px 36px rgba(255, 159, 28, 0.8), 0 0 32px rgba(255, 209, 102, 0.85); }
+}
+
+/* Mobile Buttons Zone (Right Side Run & Jump) */
+.mobile-buttons-zone {
+  position: absolute;
+  bottom: max(26px, env(safe-area-inset-bottom, 26px));
+  right: max(22px, env(safe-area-inset-right, 22px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mobile-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid rgba(246, 211, 145, 0.5);
+  background: radial-gradient(circle at 35% 35%, rgba(100, 64, 128, 0.9), rgba(38, 24, 58, 0.92));
+  color: #fff4e0;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(246, 211, 145, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: transform 0.15s, background 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+}
+
+.mobile-btn:active {
+  transform: scale(0.92);
+}
+
+.m-btn-icon { font-size: 1.25rem; line-height: 1; }
+.m-btn-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ffd787;
+}
+
+.mobile-run-btn.is-running {
+  background: radial-gradient(circle at 35% 35%, #ffd166, #e08b26);
+  border-color: #ffffff;
+  color: #38223a;
+  box-shadow: 0 0 24px rgba(255, 209, 102, 0.8);
+}
+.mobile-run-btn.is-running .m-btn-label {
+  color: #38223a;
+}
+
+.mobile-jump-btn:active {
+  background: radial-gradient(circle at 35% 35%, #ffb4a2, #c86b85);
+}
+
+/* 4. Princess Welcome & Controls Tutorial Modal */
+.tutorial-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(11, 7, 24, 0.82);
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fade-in 0.3s ease-out both;
+}
+
+.tutorial-card {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(246, 211, 145, 0.38);
+  background: radial-gradient(circle at 50% 0%, rgba(115, 75, 126, 0.45), transparent 60%), linear-gradient(150deg, #281e3d, #161026 80%);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.55), 0 0 35px rgba(246, 211, 145, 0.18);
+  padding: 34px 28px 30px;
+  color: #fff4e0;
+}
+
+.tutorial-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(246, 211, 145, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff4e0;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: 0.2s;
+}
+
+.tutorial-close:hover {
+  background: rgba(246, 211, 145, 0.25);
+  color: #ffffff;
+}
+
+.tutorial-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  color: #ffd166;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.tutorial-card h3 {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  margin: 0 0 6px;
+  color: #ffffff;
+}
+
+.tutorial-subtitle {
+  font-size: 0.86rem;
+  color: #d8c9e0;
+  margin: 0 0 20px;
+}
+
+.tutorial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .tutorial-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.tutorial-col {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(246, 211, 145, 0.18);
+}
+
+.tutorial-col h4 {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  color: #ffd787;
+  font-weight: 600;
+}
+
+.tutorial-col ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.78rem;
+  color: #eee1f3;
+  line-height: 1.65;
+}
+
+.tutorial-col strong {
+  color: #ffffff;
+}
+
+.tutorial-tip {
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.3);
+  font-size: 0.78rem;
+  color: #fff3df;
+  margin-bottom: 22px;
+  line-height: 1.45;
+}
+
+.tutorial-start-btn {
+  width: 100%;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 14px;
+}
+
+/* 5. Responsive Tweaks for Mobile Landscape and Portrait */
+@media (max-width: 768px) {
+  .quest-guide-panel {
+    top: 142px;
+    right: 12px;
+    max-width: 290px;
+  }
+  .objective-beacon {
+    top: 142px;
+  }
+}
+
+/* =========================================================================
+   ADVENTURE MODE & WELCOME MODE TRANSITIONS
+   ========================================================================= */
+
+/* Welcome Mode explore button */
+.btn-explore-kingdom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 20px;
+  border-radius: 99px;
+  border: 1px solid rgba(246, 211, 145, 0.65);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(227, 157, 72, 0.32));
+  color: #fff4e0;
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 0 14px rgba(246, 211, 145, 0.2);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s;
+}
+
+.btn-explore-kingdom:hover {
+  transform: translateY(-2px);
+  border-color: #ffd166;
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.35), rgba(227, 157, 72, 0.5));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 20px rgba(246, 211, 145, 0.4);
+}
+
+/* Floating Return to Welcome Screen button */
+.btn-return-welcome {
+  position: fixed;
+  top: 74px;
+  right: 24px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1.5px solid rgba(246, 211, 145, 0.65);
+  background: rgba(28, 19, 48, 0.92);
+  color: #fff4e0;
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(246, 211, 145, 0.25);
+  backdrop-filter: blur(14px);
+  transition: opacity 0.35s ease, transform 0.35s ease, background 0.2s, border-color 0.2s;
+}
+
+.btn-return-welcome:hover {
+  background: rgba(56, 34, 78, 0.98);
+  border-color: #ffd166;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 22px rgba(246, 211, 145, 0.45);
+}
+
+.btn-return-welcome kbd {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  font-family: monospace;
+  color: #ffd166;
+}
+
+/* Transitions for Adventure Mode */
+.kingdom .kingdom-heading,
+.kingdom .landmark-grid,
+.kingdom .kingdom-footer {
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              max-height 0.4s ease,
+              margin 0.4s ease;
+}
+
+.kingdom.adventure-mode {
+  pointer-events: none;
+}
+
+.kingdom.adventure-mode .kingdom-heading {
+  opacity: 0;
+  transform: translateY(-28px);
+  max-height: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kingdom.adventure-mode .landmark-grid {
+  opacity: 0;
+  transform: translateY(36px) scale(0.96);
+  max-height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kingdom.adventure-mode .kingdom-footer {
+  opacity: 0;
+  transform: translateY(20px);
+  max-height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Ensure HUD and prompts stay interactive in Adventure Mode */
+.princess-hud,
+.topbar,
+.objective-beacon,
+.quest-guide-panel,
+.world-prompt,
+.mobile-controls,
+.btn-return-welcome {
+  pointer-events: auto !important;
+}
+
+@media (max-width: 768px) {
+  .btn-return-welcome {
+    top: 72px;
+    right: 12px;
+    padding: 6px 12px;
+    font-size: 0.74rem;
+  }
+  .btn-return-welcome kbd {
+    display: none;
+  }
+}
+
+/* =========================================================================
+   PLAY AGAIN & RESTART ADVENTURE STYLES
+   ========================================================================= */
+.quests-replay-banner {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: radial-gradient(circle at 85% 20%, rgba(255, 209, 102, 0.18), transparent 50%),
+              linear-gradient(135deg, rgba(74, 45, 90, 0.45), rgba(30, 20, 48, 0.85));
+  border: 1px solid rgba(246, 211, 145, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 0 16px rgba(246, 211, 145, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.quests-replay-title {
+  margin: 0 0 6px;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: #fff4df;
+}
+
+.quests-replay-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #dfd0e6;
+  line-height: 1.55;
+  max-width: 520px;
+}
+
+.guide-btn-restart {
+  border-color: rgba(255, 209, 102, 0.45);
+  background: rgba(255, 209, 102, 0.12);
+  color: #ffd787;
+}
+
+.guide-btn-restart:hover {
+  background: rgba(255, 209, 102, 0.28);
+  color: #ffffff;
+  border-color: #ffd166;
+}
+
+.guide-btn-new-game {
+  border-color: rgba(255, 179, 198, 0.45);
+  background: rgba(255, 179, 198, 0.12);
+  color: #ffccd5;
+}
+
+.guide-btn-new-game:hover {
+  background: rgba(255, 179, 198, 0.28);
+  color: #ffffff;
+  border-color: #ffb3c6;
+}
+
+.text-button-restart {
+  color: #fce2a6;
+}
+
+.text-button-restart:hover {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 209, 102, 0.6);
+}
+
+#btn-cancel-restart {
+  background: rgba(30, 20, 48, 0.65);
+  border: 1.5px solid rgba(246, 211, 145, 0.4);
+  color: #fff4e0;
+  font-weight: 600;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#btn-cancel-restart:hover {
+  background: rgba(60, 40, 85, 0.85);
+  border-color: #ffd166;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+#btn-confirm-restart {
+  font-weight: 700;
+  border-radius: 99px;
+  cursor: pointer;
+}
+
 
 

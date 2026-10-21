@@ -191,10 +191,22 @@
         </section>
 
         <section id="kingdom" class="kingdom hidden" aria-label="Explore the magical kingdom">
+          <!-- Floating Return to Welcome Cards Button (Active during Adventure Mode) -->
+          <button id="btn-return-welcome" class="btn-return-welcome hidden" type="button" title="Return to Welcome Cards (H)">
+            <span class="return-icon">🏰</span>
+            <span class="return-text">Welcome Cards</span>
+            <kbd>H</kbd>
+          </button>
+
           <div class="kingdom-heading">
             <p class="eyebrow">YOUR STORY STARTS HERE 💖</p>
             <h2>Welcome, Princess Yunisha! 💖</h2>
             <p>Choose a glowing landmark and see where the magic takes you.</p>
+            <button id="btn-explore-kingdom" class="btn-explore-kingdom" type="button" title="Stroll freely through the 3D kingdom">
+              <span class="btn-icon">🌿</span>
+              <span>Explore 3D Kingdom</span>
+              <span class="btn-icon">✨</span>
+            </button>
           </div>
           <div id="world-prompt" class="world-prompt hidden" aria-live="polite">
             <button id="world-prompt-btn" type="button" class="world-prompt-btn">
@@ -248,18 +260,154 @@
             </button>
           </nav>
           <div class="kingdom-footer">
-            <button class="text-button" data-open="map">🗺️ Royal Kingdom Map <span>→</span></button>
-            <button class="text-button" data-open="journal">📖 Princess Journal <span>→</span></button>
-            <button class="text-button" data-open="wardrobe">👗 Royal Dressing Room <span>→</span></button>
-            <button class="text-button" data-open="quests">📜 Story Quests <span>→</span></button>
             <button class="text-button" data-open="letter">💌 Letter from Didi <span>→</span></button>
             <button class="text-button text-button-secret" data-open="secret">🗝️ Discover Secret Room <span>→</span></button>
             <button class="text-button" data-open="final">✦ A final little surprise <span>→</span></button>
             <button class="text-button" data-open="videos">🎬 Funny Videos <span>→</span></button>
+            <button class="text-button text-button-restart" id="btn-footer-restart" type="button">🔄 Restart Adventure <span>→</span></button>
           </div>
-          <p class="explore-hint">WASD or arrow keys to stroll · Shift to run · Space to hop · Approach landmarks or click to explore</p>
         </section>
       </main>
+
+      <!-- Floating Objective Compass / Beacon -->
+      <div id="objective-beacon" class="objective-beacon hidden" aria-label="Objective Compass">
+        <button id="beacon-btn" type="button" class="beacon-pill" title="Track active objective">
+          <span id="beacon-arrow" class="beacon-arrow">▲</span>
+          <span id="beacon-label" class="beacon-label">Nearest Star</span>
+          <span id="beacon-dist" class="beacon-dist">--</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Adventure Quest Guide Panel -->
+      <aside id="quest-guide-panel" class="quest-guide-panel hidden" aria-label="Adventure Guide">
+        <button id="quest-guide-toggle" type="button" class="quest-guide-toggle" aria-expanded="false" title="Toggle Adventure Guide">
+          <span class="guide-toggle-icon">📜</span>
+          <span class="guide-toggle-title">Adventure Guide</span>
+          <span id="guide-badge-count" class="guide-badge">Tasks</span>
+          <span class="guide-chevron">▾</span>
+        </button>
+        <div id="quest-guide-body" class="quest-guide-body hidden">
+          <div class="guide-header">
+            <h4>Princess Yunisha's Quests ✨</h4>
+            <span class="guide-sub">Explore the 3D kingdom to complete your story</span>
+          </div>
+          <div class="guide-counters">
+            <div class="guide-counter-pill" id="counter-stars">
+              <span class="counter-icon">⭐</span>
+              <span class="counter-name">Stars</span>
+              <strong class="counter-val" id="guide-stars-val">0/3</strong>
+            </div>
+            <div class="guide-counter-pill" id="counter-diyas">
+              <span class="counter-icon">🪔</span>
+              <span class="counter-name">Diyas</span>
+              <strong class="counter-val" id="guide-diyas-val">0/5</strong>
+            </div>
+            <div class="guide-counter-pill" id="counter-garlands">
+              <span class="counter-icon">🌼</span>
+              <span class="counter-name">Garlands</span>
+              <strong class="counter-val" id="guide-garlands-val">0/3</strong>
+            </div>
+            <div class="guide-counter-pill" id="counter-treasures">
+              <span class="counter-icon">🔍</span>
+              <span class="counter-name">Treasures</span>
+              <strong class="counter-val" id="guide-treasures-val">0/3</strong>
+            </div>
+          </div>
+          <div class="guide-active-task">
+            <div class="task-eyebrow">CURRENT OBJECTIVE</div>
+            <div id="guide-task-text" class="task-text">Collect all 3 Golden Stars on the kingdom pathways.</div>
+            <div id="guide-task-hint" class="task-hint">💡 Walk along the crystal bridge and garden path to find them!</div>
+          </div>
+          <div class="guide-actions">
+            <button id="guide-ask-kari-btn" type="button" class="guide-btn guide-btn-kari">
+              <span>🦋</span> Ask Kari
+            </button>
+            <button id="guide-beacon-toggle-btn" type="button" class="guide-btn guide-btn-beacon">
+              <span>📍</span> Show Destination
+            </button>
+            <button id="guide-help-btn" type="button" class="guide-btn guide-btn-help">
+              <span>❓</span> How to Play
+            </button>
+            <button id="guide-restart-btn" type="button" class="guide-btn guide-btn-restart" title="Start a fresh adventure">
+              <span>🔄</span> Play Again
+            </button>
+            <button id="guide-new-game-btn" type="button" class="guide-btn guide-btn-new-game" title="Restart all progress and start a new game">
+              <span>✨</span> New Game
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Touch / Android Virtual Controls Overlay -->
+      <div id="mobile-controls" class="mobile-controls hidden" aria-label="Mobile Game Controls">
+        <!-- Virtual Joystick on Bottom-Left -->
+        <div id="joystick-zone" class="joystick-zone">
+          <div id="joystick-base" class="joystick-base">
+            <div id="joystick-knob" class="joystick-knob"></div>
+          </div>
+        </div>
+
+        <!-- Center Contextual Action Button (Large, Easy to Tap) -->
+        <div id="mobile-action-zone" class="mobile-action-zone">
+          <button id="mobile-interact-btn" type="button" class="mobile-interact-btn hidden">
+            <span id="mobile-interact-icon" class="mobile-interact-icon">✨</span>
+            <span id="mobile-interact-label" class="mobile-interact-label">INTERACT</span>
+          </button>
+        </div>
+
+        <!-- Right Side: Run & Jump Buttons -->
+        <div id="mobile-buttons-zone" class="mobile-buttons-zone">
+          <button id="mobile-run-btn" type="button" class="mobile-btn mobile-run-btn" aria-label="Run">
+            <span class="m-btn-icon">⚡</span>
+            <span class="m-btn-label">RUN</span>
+          </button>
+          <button id="mobile-jump-btn" type="button" class="mobile-btn mobile-jump-btn" aria-label="Hop / Jump">
+            <span class="m-btn-icon">✨</span>
+            <span class="m-btn-label">JUMP</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Princess Welcome & Controls Tutorial Modal -->
+      <div id="tutorial-modal" class="tutorial-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+        <div class="tutorial-card">
+          <button id="tutorial-close-btn" type="button" class="tutorial-close" aria-label="Close tutorial">×</button>
+          <div class="tutorial-badge">👑 ROYAL GUIDEBOOK</div>
+          <h3 id="tutorial-title">Welcome, Princess Yunisha! 💖</h3>
+          <p class="tutorial-subtitle">Here is how to explore your magical 3D Dashain Kingdom:</p>
+          
+          <div class="tutorial-grid">
+            <div class="tutorial-col">
+              <h4>💻 Laptop & Desktop</h4>
+              <ul>
+                <li><strong>W A S D</strong> or <strong>Arrow Keys</strong> to stroll</li>
+                <li><strong>Shift</strong> to run with royal speed</li>
+                <li><strong>Space</strong> to hop with joy</li>
+                <li><strong>Click & Drag</strong> to rotate your view</li>
+                <li><strong>E</strong> or click prompts to interact</li>
+              </ul>
+            </div>
+            <div class="tutorial-col">
+              <h4>📱 Mobile & Touch</h4>
+              <ul>
+                <li><strong>Virtual Joystick</strong> on bottom-left to stroll</li>
+                <li>Tap <strong>RUN</strong> to run swiftly</li>
+                <li>Tap <strong>JUMP</strong> to hop with joy</li>
+                <li><strong>Drag anywhere on screen</strong> to rotate camera</li>
+                <li>Tap glowing <strong>Action Buttons</strong> to collect & light</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="tutorial-tip">
+            <span>🦋 <strong>Tip from Kari:</strong> Follow the glowing compass at the top of the screen or ask me anytime if you get lost!</span>
+          </div>
+
+          <button id="tutorial-start-btn" type="button" class="button button-gold tutorial-start-btn">
+            START ADVENTURE ✨
+          </button>
+        </div>
+      </div>
 
       <div id="modal-root"></div>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>

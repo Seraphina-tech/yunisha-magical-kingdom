@@ -24,6 +24,9 @@ export function createWorld(canvas, onFallback) {
       collectQuestStar() {},
       lightDiya() {},
       placeMarigold() {},
+      resetQuestStars() {},
+      resetDiyas() {},
+      resetMarigolds() {},
       teleportTo() {},
     };
   }
@@ -110,6 +113,12 @@ export function createWorld(canvas, onFallback) {
   const foliageDeepPink = material("#f472b6", { roughness: 0.8 });
   const foliageGreen = material("#52b788", { roughness: 0.8 });
   const foliageDarkGreen = material("#2d6a4f", { roughness: 0.85 });
+  const vermilionMat = material("#b32822", { roughness: 0.55 });
+  const woodMat = material("#64321c", { roughness: 0.75 });
+  const marigoldOrange = material("#ff7b00", { roughness: 0.5 });
+  const marigoldYellow = material("#ffc300", { roughness: 0.5 });
+  const jamaraGreenMat = material("#489e3b", { roughness: 0.65 });
+  const flameMat = material("#fff5c0", { emissive: "#ff9015", emissiveIntensity: 2.2, roughness: 0.3 });
 
   const addMesh = (geometry, mat, parent = fairyWorld, position = [0, 0, 0]) => {
     const mesh = new THREE.Mesh(geometry, mat);
@@ -208,6 +217,21 @@ export function createWorld(canvas, onFallback) {
   // 6. PATHWAYS
   addMesh(new THREE.BoxGeometry(3.2, 0.06, 12), pathMat, fairyWorld, [0, 0.26, -1]).receiveShadow = true;
   addMesh(new THREE.BoxGeometry(16, 0.05, 2.6), pathMat, fairyWorld, [0, 0.25, 1.5]).receiveShadow = true;
+
+  // Festive Dashain Toran Gateway (leads into Dashain Courtyard)
+  const dashainGateway = new THREE.Group();
+  dashainGateway.position.set(0, 0.25, 5.0);
+  fairyWorld.add(dashainGateway);
+  cylinder(0.24, 0.28, 4.0, vermilionMat, [-1.8, 2.0, 0], 12, dashainGateway);
+  cylinder(0.24, 0.28, 4.0, vermilionMat, [1.8, 2.0, 0], 12, dashainGateway);
+  for (const gx of [-1.8, 1.8]) {
+    cylinder(0.34, 0.42, 0.35, goldMat, [gx, 0.18, 0], 12, dashainGateway);
+    addMesh(new THREE.SphereGeometry(0.2, 10, 8), goldMat, dashainGateway, [gx, 4.1, 0]);
+  }
+  addMesh(new THREE.BoxGeometry(4.2, 0.38, 0.35), vermilionMat, dashainGateway, [0, 3.85, 0]);
+  const gatewayToran = addMesh(new THREE.TorusGeometry(1.5, 0.12, 8, 24, Math.PI), marigoldOrange, dashainGateway, [0, 3.65, 0.16]);
+  gatewayToran.rotation.z = Math.PI;
+  const dashainPortalOrb = addMesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color: "#ffd166", transparent: true, opacity: 0.85 }), dashainGateway, [0, 2.3, 0]);
 
   // 7. GRAND FAIRY-TALE CASTLE
   const castle = new THREE.Group();
@@ -389,21 +413,62 @@ export function createWorld(canvas, onFallback) {
     }
   });
 
-  // 11. THREE QUEST STARS IN THE 3D WORLD
+  // 11. THREE QUEST STARS IN THE 3D WORLD (True 5-Pointed Beveled Golden Stars)
+  function create5PointStarGeo(innerR = 0.2, outerR = 0.48, depth = 0.14) {
+    const shape = new THREE.Shape();
+    const pts = 5;
+    for (let i = 0; i < pts * 2; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const a = (i * Math.PI) / pts - Math.PI / 2;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 0.04,
+      bevelThickness: 0.04,
+    });
+  }
+
+  const starMaterial = new THREE.MeshStandardMaterial({
+    color: "#ffd166",
+    metalness: 0.45,
+    roughness: 0.25,
+    emissive: "#ffb703",
+    emissiveIntensity: 0.8,
+  });
+
   const questStars = {};
   [
-    { id: "star_1", x: -1.5, y: 1.3, z: 5.5, label: "Star by Crystal Bridge" },
-    { id: "star_2", x: -8.0, y: 1.3, z: -1.0, label: "Star in Enchanted Garden" },
-    { id: "star_3", x: 2.5, y: 1.5, z: -3.0, label: "Star by Castle Balcony" },
-  ].forEach(({ id, x, y, z }) => {
+    { id: "star_1", x: -2.0, y: 1.4, z: 4.0, label: "Crystal Bridge Pathway", title: "Collect Golden Star 1 ⭐ (Crystal Bridge)" },
+    { id: "star_2", x: -7.5, y: 1.4, z: 1.5, label: "Enchanted Garden Entrance", title: "Collect Golden Star 2 ⭐ (Enchanted Garden)" },
+    { id: "star_3", x: 3.2, y: 1.4, z: -2.0, label: "Castle East Lawn", title: "Collect Golden Star 3 ⭐ (Castle Steps)" },
+  ].forEach(({ id, x, y, z, label, title }, index) => {
     const starGroup = new THREE.Group();
     starGroup.position.set(x, y, z);
     fairyWorld.add(starGroup);
-    // Glowing 3D Star
-    const starCore = addMesh(new THREE.OctahedronGeometry(0.35, 0), windowGlow, starGroup);
-    starCore.scale.set(1, 1.6, 1);
-    const starHalo = addMesh(new THREE.SphereGeometry(0.7, 12, 10), new THREE.MeshBasicMaterial({ color: "#fef08a", transparent: true, opacity: 0.3 }), starGroup);
-    questStars[id] = { group: starGroup, core: starCore, halo: starHalo, collected: false, x, z };
+
+    // 5-Pointed Golden Star
+    const starGeo = create5PointStarGeo();
+    starGeo.center();
+    const starCore = new THREE.Mesh(starGeo, starMaterial);
+    starGroup.add(starCore);
+
+    // Golden Floating Halo Ring
+    const starHalo = addMesh(new THREE.TorusGeometry(0.55, 0.03, 8, 24), new THREE.MeshBasicMaterial({ color: "#ffeaa7", transparent: true, opacity: 0.55 }), starGroup);
+    starHalo.rotation.x = Math.PI / 2;
+
+    // Small Carved Pedestal Marker on Ground
+    const basePillar = addMesh(new THREE.CylinderGeometry(0.35, 0.45, 0.18, 12), material("#ebd8c4", { roughness: 0.8 }), fairyWorld, [x, 0.09, z]);
+    addMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 12), goldMat, fairyWorld, [x, 0.21, z]);
+
+    questStars[id] = { group: starGroup, core: starCore, halo: starHalo, basePillar, collected: false, x, z, label, title, index };
   });
 
   // 12. FLOATING PETALS & PARTICLES
@@ -442,12 +507,6 @@ export function createWorld(canvas, onFallback) {
   // =========================================================================
   const dashainGroundMat = material("#d48b48", { roughness: 0.92 });
   const courtyardStoneMat = material("#fce7c8", { roughness: 0.85 });
-  const vermilionMat = material("#b32822", { roughness: 0.55 });
-  const woodMat = material("#64321c", { roughness: 0.75 });
-  const marigoldOrange = material("#ff7b00", { roughness: 0.5 });
-  const marigoldYellow = material("#ffc300", { roughness: 0.5 });
-  const jamaraGreenMat = material("#489e3b", { roughness: 0.65 });
-  const flameMat = material("#fff5c0", { emissive: "#ff9015", emissiveIntensity: 2.2, roughness: 0.3 });
 
   const dCourtyard = addMesh(new THREE.CylinderGeometry(18, 22, 2.8, 64), dashainGroundMat, dashainWorld, [0, -1.3, 0]);
   dCourtyard.scale.z = 0.78;
@@ -466,43 +525,119 @@ export function createWorld(canvas, onFallback) {
   // 5 INDIVIDUALLY IDENTIFIABLE DIYAS IN DASHAIN COURTYARD
   const diyas = {};
   const diyaCoords = [
-    { id: "diya_1", x: -6.0, z: 2.5 },
-    { id: "diya_2", x: -3.0, z: 2.5 },
-    { id: "diya_3", x: 0.0, z: 2.5 },
-    { id: "diya_4", x: 3.0, z: 2.5 },
-    { id: "diya_5", x: 6.0, z: 2.5 },
+    { id: "diya_1", title: "Light Sacred Diya 1 🪔", x: -4.8, z: 1.6 },
+    { id: "diya_2", title: "Light Sacred Diya 2 🪔", x: -2.4, z: 2.2 },
+    { id: "diya_3", title: "Light Sacred Diya 3 🪔", x: 0.0, z: 2.6 },
+    { id: "diya_4", title: "Light Sacred Diya 4 🪔", x: 2.4, z: 2.2 },
+    { id: "diya_5", title: "Light Sacred Diya 5 🪔", x: 4.8, z: 1.6 },
   ];
-  diyaCoords.forEach(({ id, x, z }) => {
+  diyaCoords.forEach(({ id, title, x, z }, index) => {
     const dGroup = new THREE.Group();
-    dGroup.position.set(x, 0.38, z);
+    dGroup.position.set(x, 0.2, z);
     dashainWorld.add(dGroup);
-    // Diya clay cup
-    addMesh(new THREE.CylinderGeometry(0.24, 0.46, 0.26, 16), material("#964b28"), dGroup, [0, 0.13, 0]);
-    // Flame (hidden initially)
-    const flame = addMesh(new THREE.ConeGeometry(0.18, 0.58, 12), flameMat, dGroup, [0, 0.48, 0]);
-    flame.visible = false;
-    // Diya point light
-    const light = new THREE.PointLight("#ff9d24", 0, 6, 2);
+
+    // Decorative Sandstone Pedestal Plinth
+    addMesh(new THREE.CylinderGeometry(0.55, 0.65, 0.28, 16), material("#f3dfca", { roughness: 0.8 }), dGroup, [0, 0.14, 0]);
+    // Polished Brass Rim Collar
+    addMesh(new THREE.CylinderGeometry(0.48, 0.48, 0.08, 16), goldMat, dGroup, [0, 0.32, 0]);
+    // Terracotta Diya Oil Lamp Cup
+    addMesh(new THREE.CylinderGeometry(0.32, 0.44, 0.22, 16), material("#a84b25", { roughness: 0.7 }), dGroup, [0, 0.45, 0]);
+    // Oil Well & Wick Tip
+    addMesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 16), material("#542813"), dGroup, [0, 0.54, 0]);
+    addMesh(new THREE.ConeGeometry(0.05, 0.12, 8), material("#f8eed9"), dGroup, [0, 0.58, 0.1]);
+
+    // Flame Core & Outer Glow (hidden until lit)
+    const flameGroup = new THREE.Group();
+    flameGroup.position.set(0, 0.64, 0.06);
+    dGroup.add(flameGroup);
+    const flame = addMesh(new THREE.ConeGeometry(0.16, 0.52, 12), flameMat, flameGroup, [0, 0.26, 0]);
+    const flameCore = addMesh(new THREE.ConeGeometry(0.08, 0.32, 10), material("#ffffff", { emissive: "#ffffff", emissiveIntensity: 2.5 }), flameGroup, [0, 0.16, 0]);
+    flameGroup.visible = false;
+
+    // Unlit Golden Beacon Ring (pulses and guides player when unlit)
+    const beaconGroup = new THREE.Group();
+    beaconGroup.position.set(0, 1.25, 0);
+    dGroup.add(beaconGroup);
+    const beaconHalo = addMesh(new THREE.TorusGeometry(0.35, 0.04, 8, 20), new THREE.MeshBasicMaterial({ color: "#ffd166", transparent: true, opacity: 0.8 }), beaconGroup);
+    beaconHalo.rotation.x = Math.PI / 2;
+    const beaconSpark = addMesh(new THREE.SphereGeometry(0.12, 10, 8), material("#fff5ba", { emissive: "#ff9015", emissiveIntensity: 2 }), beaconGroup);
+
+    // Warm Point Light (turned on when lit)
+    const light = new THREE.PointLight("#ff9d24", 0, 7, 2);
     light.position.set(x, 1.2, z);
     dashainWorld.add(light);
-    diyas[id] = { group: dGroup, flame, light, lit: false, x, z };
+
+    diyas[id] = { group: dGroup, flameGroup, flame, flameCore, light, beacon: beaconGroup, lit: false, x, z, title, index };
   });
 
-  // 3 MARIGOLD DECORATION ANCHORS
+  // 3 CEREMONIAL MARIGOLD TORAN PILLARS & DECORATION POINTS
   const marigoldDecorations = {};
-  [
-    { id: "marigold_1", x: -4.0, y: 3.5, z: -6.0 },
-    { id: "marigold_2", x: 0.0, y: 4.5, z: -6.0 },
-    { id: "marigold_3", x: 4.0, y: 3.5, z: -6.0 },
-  ].forEach(({ id, x, y, z }) => {
+  const marigoldCoords = [
+    { id: "marigold_1", title: "Hang Marigold Garland 1 🌼", x: -4.0, z: -1.5 },
+    { id: "marigold_2", title: "Hang Marigold Garland 2 🌼", x: 0.0, z: -3.2 },
+    { id: "marigold_3", title: "Hang Marigold Garland 3 🌼", x: 4.0, z: -1.5 },
+  ];
+  marigoldCoords.forEach(({ id, title, x, z }, index) => {
     const mGroup = new THREE.Group();
-    mGroup.position.set(x, y, z);
+    mGroup.position.set(x, 0.2, z);
     dashainWorld.add(mGroup);
-    // Garland strand
-    const garland = addMesh(new THREE.TorusGeometry(0.6, 0.18, 8, 20), marigoldOrange, mGroup);
-    garland.scale.set(1, 1.4, 0.5);
-    garland.visible = false;
-    marigoldDecorations[id] = { group: mGroup, garland, placed: false, x, z };
+
+    // 1. Carved Ceremonial Vermilion Toran Pillar
+    // Stone Base Plinth
+    addMesh(new THREE.CylinderGeometry(0.55, 0.68, 0.35, 12), material("#ebd8c4", { roughness: 0.85 }), mGroup, [0, 0.18, 0]);
+    // Vermilion Lacquered Wood Column
+    cylinder(0.2, 0.24, 2.5, vermilionMat, [0, 1.55, 0], 12, mGroup);
+    // Brass Ring Collars
+    cylinder(0.26, 0.26, 0.08, goldMat, [0, 0.42, 0], 12, mGroup);
+    cylinder(0.26, 0.26, 0.08, goldMat, [0, 2.65, 0], 12, mGroup);
+    // Carved Wooden Crossbar Arm
+    addMesh(new THREE.BoxGeometry(1.8, 0.2, 0.22), woodMat, mGroup, [0, 2.7, 0]);
+    // Brass Lotus Finials on ends of crossbar
+    for (const cx of [-0.9, 0.9]) {
+      addMesh(new THREE.SphereGeometry(0.14, 10, 8), goldMat, mGroup, [cx, 2.7, 0]);
+    }
+    // Brass Hanging Hooks
+    for (const hx of [-0.65, 0, 0.65]) {
+      const hook = addMesh(new THREE.TorusGeometry(0.06, 0.02, 6, 12, Math.PI), goldMat, mGroup, [hx, 2.58, 0]);
+      hook.rotation.z = Math.PI;
+    }
+
+    // 2. Unplaced Garland Target Halo (Glows and pulses at eye level to guide player)
+    const beaconGroup = new THREE.Group();
+    beaconGroup.position.set(0, 1.85, 0);
+    mGroup.add(beaconGroup);
+    const beaconRing = addMesh(new THREE.TorusGeometry(0.52, 0.05, 8, 24), new THREE.MeshBasicMaterial({ color: "#ffb703", transparent: true, opacity: 0.8 }), beaconGroup);
+    beaconRing.scale.set(1, 1.25, 0.4);
+    const beaconFlower = addMesh(new THREE.SphereGeometry(0.18, 12, 10), material("#ffd166", { emissive: "#ff9f1c", emissiveIntensity: 1.8 }), beaconGroup);
+
+    // 3. Beautiful Draped Marigold Garland (Visible when placed)
+    const garlandGroup = new THREE.Group();
+    garlandGroup.position.set(0, 2.58, 0);
+    mGroup.add(garlandGroup);
+
+    // Primary Orange Blossom Swag
+    const swag1 = addMesh(new THREE.TorusGeometry(0.65, 0.15, 10, 24, Math.PI), marigoldOrange, garlandGroup, [0, 0, 0]);
+    swag1.rotation.z = Math.PI;
+    swag1.scale.set(1.1, 1.4, 0.8);
+
+    // Secondary Saffron Yellow Blossom Inner Swag
+    const swag2 = addMesh(new THREE.TorusGeometry(0.42, 0.12, 8, 20, Math.PI), marigoldYellow, garlandGroup, [0, -0.05, 0.04]);
+    swag2.rotation.z = Math.PI;
+    swag2.scale.set(1.0, 1.25, 0.8);
+
+    // Mango Leaves (Jamara Green)
+    for (const lx of [-0.65, -0.3, 0, 0.3, 0.65]) {
+      const leaf = addMesh(new THREE.ConeGeometry(0.06, 0.28, 4), jamaraGreenMat, garlandGroup, [lx, -0.12, 0.06]);
+      leaf.rotation.z = Math.PI + (lx * 0.2);
+    }
+
+    // Hanging Golden Temple Bells at the lowest point
+    const bell = addMesh(new THREE.CylinderGeometry(0.06, 0.12, 0.18, 8), goldMat, garlandGroup, [0, -0.92, 0]);
+    addMesh(new THREE.SphereGeometry(0.06, 8, 6), goldMat, garlandGroup, [0, -1.02, 0]);
+
+    garlandGroup.visible = false;
+
+    marigoldDecorations[id] = { group: mGroup, garland: garlandGroup, beacon: beaconGroup, placed: false, x, z, title, index };
   });
 
   // 3 Dashain Treasures (Marigold, Jamara, Tika plate)
@@ -546,6 +681,19 @@ export function createWorld(canvas, onFallback) {
   addMesh(new THREE.SphereGeometry(0.32, 16, 12), vermilionMat, thali, [0, 0.26, 0]);
   const tikaAura = addMesh(new THREE.SphereGeometry(1.1, 16, 16), new THREE.MeshBasicMaterial({ color: "#ffd166", transparent: true, opacity: 0.35 }), thali, [0, 0.2, 0]);
   treasureObjects.tika = { group: tikaGroup, head: thali, aura: tikaAura, collected: false, x: 0, z: 4.2 };
+
+  // Gateway Archway back to Fairy Kingdom
+  const fairyGateway = new THREE.Group();
+  fairyGateway.position.set(0, 0.25, 6.0);
+  dashainWorld.add(fairyGateway);
+  cylinder(0.24, 0.28, 4.0, vermilionMat, [-1.8, 2.0, 0], 12, fairyGateway);
+  cylinder(0.24, 0.28, 4.0, vermilionMat, [1.8, 2.0, 0], 12, fairyGateway);
+  for (const gx of [-1.8, 1.8]) {
+    cylinder(0.34, 0.42, 0.35, goldMat, [gx, 0.18, 0], 12, fairyGateway);
+    addMesh(new THREE.SphereGeometry(0.2, 10, 8), goldMat, fairyGateway, [gx, 4.1, 0]);
+  }
+  addMesh(new THREE.BoxGeometry(4.2, 0.38, 0.35), goldMat, fairyGateway, [0, 3.85, 0]);
+  const fairyPortalOrb = addMesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color: "#bae6fd", transparent: true, opacity: 0.85 }), fairyGateway, [0, 2.3, 0]);
 
   // =========================================================================
   // PRINCESS YUNISHA CHARACTER & CUSTOMIZABLE WARDROBE
@@ -702,6 +850,7 @@ export function createWorld(canvas, onFallback) {
   let previousFrameTime = performance.now();
   let proximityCallback = null;
   let lastProximityCheck = 0;
+  let isAdventureMode = false;
 
   const rememberOpacity = (group, opacity) => {
     group.traverse((object) => {
@@ -776,8 +925,19 @@ export function createWorld(canvas, onFallback) {
     }
   };
 
+  const inputState = {
+    joystickX: 0,
+    joystickY: 0,
+    run: false,
+  };
+
   const keyUp = (event) => { keysDown.delete(event.key.toLowerCase()); };
-  const clearKeys = () => keysDown.clear();
+  const clearKeys = () => {
+    keysDown.clear();
+    inputState.joystickX = 0;
+    inputState.joystickY = 0;
+    inputState.run = false;
+  };
 
   canvas.addEventListener("pointerdown", down);
   canvas.addEventListener("pointermove", move);
@@ -798,63 +958,83 @@ export function createWorld(canvas, onFallback) {
     const pz = princess.position.z;
 
     if (theme === "DASHAIN_WORLD") {
-      // 1. Dashain Courtyard Diyas
+      // 1. Dashain Courtyard Diyas (5)
       for (const [id, d] of Object.entries(diyas)) {
-        if (!d.lit && Math.hypot(px - d.x, pz - d.z) < 2.2) {
-          proximityCallback({ type: "diya", id, title: "Light this Sacred Diya 🪔" });
+        if (!d.lit && Math.hypot(px - d.x, pz - d.z) < 2.4) {
+          proximityCallback({ type: "diya", id, title: d.title || "Light this Sacred Diya 🪔", actionLabel: "LIGHT DIYA 🪔", icon: "🪔" });
           return;
         }
       }
-      // 2. Marigold Decoration points
+      // 2. Marigold Decoration points (3)
       for (const [id, m] of Object.entries(marigoldDecorations)) {
         if (!m.placed && Math.hypot(px - m.x, pz - m.z) < 2.5) {
-          proximityCallback({ type: "marigold_point", id, title: "Hang Marigold Garland 🌼" });
+          proximityCallback({ type: "marigold_point", id, title: m.title || "Hang Marigold Garland 🌼", actionLabel: "PLACE MARIGOLD GARLAND 🌼", icon: "🌼" });
           return;
         }
       }
-      // 3. Treasures
+      // 3. Treasures (3)
       if (!treasureObjects.marigold.collected && Math.hypot(px - treasureObjects.marigold.x, pz - treasureObjects.marigold.z) < 2.5) {
-        proximityCallback({ type: "treasure", id: "marigold", title: "Golden Marigold 🌼" });
+        proximityCallback({ type: "treasure", id: "marigold", title: "Golden Marigold 🌼", actionLabel: "COLLECT MARIGOLD 🌼", icon: "🌼" });
         return;
       }
       if (!treasureObjects.jamara.collected && Math.hypot(px - treasureObjects.jamara.x, pz - treasureObjects.jamara.z) < 2.5) {
-        proximityCallback({ type: "treasure", id: "jamara", title: "Sacred Jamara 🌿" });
+        proximityCallback({ type: "treasure", id: "jamara", title: "Sacred Jamara 🌿", actionLabel: "COLLECT JAMARA 🌿", icon: "🌿" });
         return;
       }
       if (!treasureObjects.tika.collected && Math.hypot(px - treasureObjects.tika.x, pz - treasureObjects.tika.z) < 2.5) {
-        proximityCallback({ type: "treasure", id: "tika", title: "Dashain Tika Plate 🔴" });
+        proximityCallback({ type: "treasure", id: "tika", title: "Dashain Tika Plate 🔴", actionLabel: "COLLECT TIKA PLATE 🔴", icon: "🔴" });
+        return;
+      }
+      // 4. Return to Fairy Kingdom portal (near entrance z = 6.0)
+      if (Math.hypot(px - 0, pz - 6.0) < 2.8) {
+        proximityCallback({ type: "fairy_portal", id: "fairy_world", title: "Return to Fairy Kingdom 🏰", actionLabel: "RETURN TO FAIRY KINGDOM 🏰", icon: "🏰" });
+        return;
+      }
+      // 5. Dashain Traditions Pavilion
+      if (Math.hypot(px - 0, pz - (-7.5)) < 3.5) {
+        proximityCallback({ type: "landmark", id: "dashain", title: "Dashain Traditions & Blessings ❁", actionLabel: "DASHAIN BLESSINGS ❁", icon: "❁" });
         return;
       }
       proximityCallback(null);
     } else {
+      // Welcome Cards / Spawn Point return in Adventure Mode
+      if (isAdventureMode && Math.hypot(px - 0, pz - 2.5) < 1.3) {
+        proximityCallback({ type: "welcome_cards", id: "welcome", title: "Welcome Cards 🏰", actionLabel: "SHOW WELCOME CARDS 🏰", icon: "🏰" });
+        return;
+      }
       // Fairy World: Quest Stars
       for (const [id, s] of Object.entries(questStars)) {
-        if (!s.collected && Math.hypot(px - s.x, pz - s.z) < 2.2) {
-          proximityCallback({ type: "star", id, title: "Collect Quest Star ⭐" });
+        if (!s.collected && Math.hypot(px - s.x, pz - s.z) < 2.4) {
+          proximityCallback({ type: "star", id, title: s.title || "Collect Golden Star ⭐", actionLabel: "COLLECT STAR ⭐", icon: "⭐" });
           return;
         }
       }
       // Dressing Room Mirror
       if (Math.hypot(px - 3.5, pz - (-3.5)) < 2.4) {
-        proximityCallback({ type: "mirror", id: "wardrobe", title: "Magical Mirror / Royal Wardrobe 👗" });
+        proximityCallback({ type: "mirror", id: "wardrobe", title: "Magical Mirror / Royal Wardrobe 👗", actionLabel: "ROYAL WARDROBE 👗", icon: "👗" });
         return;
       }
       // Secret Doorway
       if (Math.hypot(px - (-6.5), pz - (-8.5)) < 2.8) {
-        proximityCallback({ type: "secret_door", id: "secret", title: "Secret Rose Doorway 🗝️" });
+        proximityCallback({ type: "secret_door", id: "secret", title: "Secret Rose Doorway 🗝️", actionLabel: "SECRET DOORWAY 🗝️", icon: "🗝️" });
+        return;
+      }
+      // Gateway to Dashain Courtyard
+      if (Math.hypot(px - 0, pz - 5.0) < 2.8) {
+        proximityCallback({ type: "dashain_portal", id: "dashain_world", title: "Enter Dashain Courtyard ❁", actionLabel: "ENTER DASHAIN COURTYARD ❁", icon: "❁" });
         return;
       }
       // Landmarks
       if (Math.hypot(px - 0, pz - (-4.0)) < 4.2) {
-        proximityCallback({ type: "landmark", id: "princess", title: "Princess Castle 👑" });
+        proximityCallback({ type: "landmark", id: "princess", title: "Princess Castle 👑", actionLabel: "ENTER CASTLE 👑", icon: "♕" });
       } else if (Math.hypot(px - (-8), pz - 2.0) < 3.2) {
-        proximityCallback({ type: "landmark", id: "simulations", title: "Enchanted Garden ❀" });
+        proximityCallback({ type: "landmark", id: "simulations", title: "Enchanted Garden ❀", actionLabel: "EXPLORE GARDEN ❀", icon: "❀" });
       } else if (Math.hypot(px - 6, pz - 2.0) < 3.2) {
-        proximityCallback({ type: "landmark", id: "gifts", title: "Hall of Gifts 🎁" });
+        proximityCallback({ type: "landmark", id: "gifts", title: "Hall of Gifts 🎁", actionLabel: "OPEN GIFTS 🎁", icon: "✧" });
       } else if (Math.hypot(px - (-7), pz - 7.5) < 3.5) {
-        proximityCallback({ type: "landmark", id: "gallery", title: "Moonlight Lake & Gallery ♡" });
+        proximityCallback({ type: "landmark", id: "gallery", title: "Moonlight Lake & Gallery ♡", actionLabel: "VIEW GALLERY ♡", icon: "♡" });
       } else if (Math.hypot(px - 8, pz - 4.0) < 3.5) {
-        proximityCallback({ type: "landmark", id: "observatory", title: "Star Observatory ☾" });
+        proximityCallback({ type: "landmark", id: "observatory", title: "Star Observatory ☾", actionLabel: "STAR OBSERVATORY ☾", icon: "☾" });
       } else {
         proximityCallback(null);
       }
@@ -901,8 +1081,20 @@ export function createWorld(canvas, onFallback) {
       sparkles.rotation.y = time * 0.4;
       if (progress >= 1) portalStartedAt = null;
     } else if (!reducedMotion) {
-      camera.position.x += (Math.sin(time * 0.12) * 1.1 + targetRotation * 9 - camera.position.x) * 0.012;
-      camera.position.y = 8.5 + Math.sin(time * 0.22) * 0.22;
+      if (isAdventureMode) {
+        const targetCamX = princess.position.x * 0.45 + targetRotation * 6;
+        const targetCamY = (theme === "DASHAIN_WORLD" ? 7.2 : 7.8) + Math.max(0, (princess.position.y - 0.38) * 0.4);
+        const targetCamZ = (theme === "DASHAIN_WORLD" ? 22 : 23.5) + princess.position.z * 0.35;
+        camera.position.x += (targetCamX - camera.position.x) * 0.045;
+        camera.position.y += (targetCamY - camera.position.y) * 0.045;
+        camera.position.z += (targetCamZ - camera.position.z) * 0.045;
+      } else {
+        const defaultCamZ = theme === "DASHAIN_WORLD" ? 30 : 27;
+        const defaultCamY = theme === "DASHAIN_WORLD" ? 8.0 : (8.5 + Math.sin(time * 0.22) * 0.22);
+        camera.position.x += (Math.sin(time * 0.12) * 1.1 + targetRotation * 9 - camera.position.x) * 0.02;
+        camera.position.y += (defaultCamY - camera.position.y) * 0.02;
+        camera.position.z += (defaultCamZ - camera.position.z) * 0.02;
+      }
 
       clouds.forEach((cloud) => {
         cloud.group.position.x = cloud.baseX + Math.sin(time * 0.08 * cloud.speed) * 4;
@@ -929,20 +1121,55 @@ export function createWorld(canvas, onFallback) {
       });
 
       sparkles.rotation.y = time * 0.025;
+
+      // Animate Courtyard Diyas & Marigold Pillars
+      Object.values(diyas).forEach((d) => {
+        if (!d.lit) {
+          if (d.beacon) {
+            d.beacon.rotation.y = time * 1.8 + d.index;
+            d.beacon.position.y = 1.25 + Math.sin(time * 3 + d.index) * 0.1;
+          }
+        } else {
+          if (d.flameGroup) {
+            const flick = 1 + Math.sin(time * 16 + d.index * 2) * 0.12;
+            d.flameGroup.scale.set(flick, 1 + Math.sin(time * 12 + d.index) * 0.15, flick);
+          }
+          if (d.light) {
+            d.light.intensity = 2.2 + Math.sin(time * 14 + d.index * 3) * 0.4;
+          }
+        }
+      });
+
+      Object.values(marigoldDecorations).forEach((m) => {
+        if (!m.placed) {
+          if (m.beacon) {
+            m.beacon.rotation.y = time * 1.2 + m.index;
+            m.beacon.position.y = 1.85 + Math.sin(time * 2.2 + m.index) * 0.12;
+          }
+        } else {
+          if (m.garland) {
+            m.garland.rotation.y = Math.sin(time * 1.2 + m.index) * 0.05;
+          }
+        }
+      });
     }
 
     // Character Movement & Controller
-    const right = Number(keysDown.has("d") || keysDown.has("arrowright")) - Number(keysDown.has("a") || keysDown.has("arrowleft"));
-    const forward = Number(keysDown.has("s") || keysDown.has("arrowdown")) - Number(keysDown.has("w") || keysDown.has("arrowup"));
-    const moving = right !== 0 || forward !== 0;
-    const run = keysDown.has("shift");
+    const kRight = Number(keysDown.has("d") || keysDown.has("arrowright")) - Number(keysDown.has("a") || keysDown.has("arrowleft"));
+    const kForward = Number(keysDown.has("s") || keysDown.has("arrowdown")) - Number(keysDown.has("w") || keysDown.has("arrowup"));
+    const moveX = kRight + inputState.joystickX;
+    const moveZ = kForward - inputState.joystickY;
+    const moveMag = Math.hypot(moveX, moveZ);
+    const moving = moveMag > 0.05;
+    const run = keysDown.has("shift") || inputState.run;
 
     if (moving && !document.getElementById("modal-root")?.firstElementChild) {
-      const length = Math.hypot(right, forward) || 1;
+      const dirX = moveMag > 1 ? moveX / moveMag : moveX;
+      const dirZ = moveMag > 1 ? moveZ / moveMag : moveZ;
       const speed = run ? 6.5 : 3.6;
-      princess.position.x = THREE.MathUtils.clamp(princess.position.x + (right / length) * speed * delta, -13, 13);
-      princess.position.z = THREE.MathUtils.clamp(princess.position.z + (forward / length) * speed * delta, -9, 9);
-      princess.rotation.y = Math.atan2(right, forward);
+      princess.position.x = THREE.MathUtils.clamp(princess.position.x + dirX * speed * delta, -13, 13);
+      princess.position.z = THREE.MathUtils.clamp(princess.position.z + dirZ * speed * delta, -9, 9);
+      princess.rotation.y = Math.atan2(moveX, moveZ);
       character.phase += delta * speed * 4;
 
       // Spawn movement trails if equipped
@@ -1009,7 +1236,18 @@ export function createWorld(canvas, onFallback) {
       checkProximity();
     }
 
-    if (!themeTransition) camera.lookAt(targetRotation * 2.5, 4.8, -1);
+    if (!themeTransition) {
+      if (isAdventureMode && !reducedMotion) {
+        const lookX = princess.position.x * 0.65;
+        const lookY = 3.6 + (princess.position.y - 0.38) * 0.5;
+        const lookZ = princess.position.z * 0.4 - 1.5;
+        camera.lookAt(lookX, lookY, lookZ);
+      } else {
+        const defaultLookY = theme === "DASHAIN_WORLD" ? 4.5 : 4.8;
+        const defaultLookZ = theme === "DASHAIN_WORLD" ? -2 : -1;
+        camera.lookAt(targetRotation * 2.5, defaultLookY, defaultLookZ);
+      }
+    }
     renderer.render(scene, camera);
 
     if (!document.hidden) frameId = requestAnimationFrame(animate);
@@ -1078,14 +1316,17 @@ export function createWorld(canvas, onFallback) {
       const d = diyas[id];
       if (!d || d.lit) return;
       d.lit = true;
-      d.flame.visible = true;
-      d.light.intensity = 1.6;
+      if (d.flameGroup) d.flameGroup.visible = true;
+      else if (d.flame) d.flame.visible = true;
+      if (d.beacon) d.beacon.visible = false;
+      if (d.light) d.light.intensity = 2.4;
     },
     placeMarigold(id) {
       const m = marigoldDecorations[id];
       if (!m || m.placed) return;
       m.placed = true;
-      m.garland.visible = true;
+      if (m.garland) m.garland.visible = true;
+      if (m.beacon) m.beacon.visible = false;
     },
     collectTreasure(id) {
       const tr = treasureObjects[id];
@@ -1099,6 +1340,28 @@ export function createWorld(canvas, onFallback) {
         tr.group.visible = true;
       });
     },
+    resetQuestStars() {
+      Object.values(questStars).forEach((st) => {
+        st.collected = false;
+        if (st.group) st.group.visible = true;
+      });
+    },
+    resetDiyas() {
+      Object.values(diyas).forEach((d) => {
+        d.lit = false;
+        if (d.flameGroup) d.flameGroup.visible = false;
+        else if (d.flame) d.flame.visible = false;
+        if (d.beacon) d.beacon.visible = true;
+        if (d.light) d.light.intensity = 0;
+      });
+    },
+    resetMarigolds() {
+      Object.values(marigoldDecorations).forEach((m) => {
+        m.placed = false;
+        if (m.garland) m.garland.visible = false;
+        if (m.beacon) m.beacon.visible = true;
+      });
+    },
     teleportTo(x, z) {
       princess.position.set(x, 0.38, z);
       camera.position.set(x, 8.5, z + 26);
@@ -1106,6 +1369,42 @@ export function createWorld(canvas, onFallback) {
     },
     onProximity(callback) {
       proximityCallback = callback;
+    },
+    setJoystick(x, y) {
+      inputState.joystickX = x;
+      inputState.joystickY = y;
+    },
+    setRunning(isRunning) {
+      inputState.run = Boolean(isRunning);
+    },
+    triggerJump() {
+      if (character.jumping <= 0) {
+        character.jumping = 1;
+      }
+    },
+    rotateCameraBy(deltaX) {
+      targetRotation = THREE.MathUtils.clamp(targetRotation + deltaX, -0.32, 0.32);
+    },
+    setAdventureMode(active) {
+      isAdventureMode = Boolean(active);
+    },
+    getPrincessPosition() {
+      return { x: princess.position.x, y: princess.position.y, z: princess.position.z };
+    },
+    getStarsList() {
+      return Object.entries(questStars).map(([id, s]) => ({ id, x: s.x, y: s.y, z: s.z, collected: Boolean(s.collected), title: s.title }));
+    },
+    getDiyasList() {
+      return Object.entries(diyas).map(([id, d]) => ({ id, x: d.x, y: d.y, z: d.z, lit: Boolean(d.lit), title: d.title }));
+    },
+    getMarigoldsList() {
+      return Object.entries(marigoldDecorations).map(([id, m]) => ({ id, x: m.x, y: m.y, z: m.z, placed: Boolean(m.placed), title: m.title }));
+    },
+    getTreasuresList() {
+      return Object.entries(treasureObjects).map(([id, tr]) => ({ id, collected: Boolean(tr.collected), label: tr.label }));
+    },
+    getTheme() {
+      return theme;
     },
     triggerCelebration() {
       this.interact("celebration");
