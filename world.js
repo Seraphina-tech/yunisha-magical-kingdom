@@ -21,6 +21,19 @@ export function createWorld(canvas, onFallback) {
       setPrincessCrown() {},
       setPrincessTrail() {},
       setKariStyle() {},
+      setJoystick() {},
+      setRunning() {},
+      triggerJump() {},
+      rotateCameraBy() {},
+      setAdventureMode() {},
+      getPrincessPosition() {
+        return { x: 0, y: 0, z: 0 };
+      },
+      castFairySpell() {},
+      collectFairyCrystal() {},
+      resetFairyCrystals() {},
+      getFairyCrystalsList() { return []; },
+      setFairyRainbowRestored() {},
       collectQuestStar() {},
       lightDiya() {},
       placeMarigold() {},
@@ -46,8 +59,11 @@ export function createWorld(canvas, onFallback) {
   camera.position.set(0, 9, 38);
   camera.lookAt(0, 5, 0);
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.2 : 1.7));
-  renderer.shadowMap.enabled = window.innerWidth >= 700;
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const touchOptimized = coarsePointer && (window.innerWidth < 700 || window.innerHeight < 700);
+  const getPixelRatio = (width) => Math.min(window.devicePixelRatio || 1, width < 700 || touchOptimized ? 1.2 : 1.7);
+  renderer.setPixelRatio(getPixelRatio(window.innerWidth));
+  renderer.shadowMap.enabled = window.innerWidth >= 700 && !touchOptimized;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -471,6 +487,45 @@ export function createWorld(canvas, onFallback) {
     questStars[id] = { group: starGroup, core: starCore, halo: starHalo, basePillar, collected: false, x, z, label, title, index };
   });
 
+  const fairyCrystals = {};
+  const fairyCrystalMaterial = material("#c4b5fd", {
+    color: "#c4b5fd",
+    emissive: "#8b5cf6",
+    emissiveIntensity: 0.7,
+    metalness: 0.2,
+    roughness: 0.22,
+  });
+  [
+    { id: "crystal_1", x: -10.7, z: 3.8, title: "Moonlit Crystal" },
+    { id: "crystal_2", x: -5.2, z: 3.8, title: "Rose Quartz Crystal" },
+    { id: "crystal_3", x: -8.0, z: -1.8, title: "Stardust Crystal" },
+  ].forEach(({ id, x, z, title }, index) => {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    fairyWorld.add(group);
+    addMesh(new THREE.CylinderGeometry(0.5, 0.62, 0.28, 8), material("#e9ddf7", { roughness: 0.65 }), group, [0, 0.14, 0]);
+    const core = addMesh(new THREE.OctahedronGeometry(0.58, 0), fairyCrystalMaterial, group, [0, 0.93, 0]);
+    core.scale.set(0.82, 1.55, 0.82);
+    const sideCrystal = addMesh(new THREE.OctahedronGeometry(0.28, 0), material(index === 1 ? "#f9a8d4" : "#93c5fd", { emissive: index === 1 ? "#be185d" : "#2563eb", emissiveIntensity: 0.35 }), group, [0.45, 0.48, 0.12]);
+    sideCrystal.scale.y = 1.35;
+    const halo = addMesh(new THREE.TorusGeometry(0.78, 0.035, 8, 24), new THREE.MeshBasicMaterial({ color: "#f3e8ff", transparent: true, opacity: 0.72 }), group, [0, 0.14, 0]);
+    halo.rotation.x = Math.PI / 2;
+    fairyCrystals[id] = { group, core, halo, x, z, title, collected: false, index };
+  });
+  const fairyRainbow = new THREE.Group();
+  fairyRainbow.position.set(-8, 0, -1.5);
+  fairyRainbow.scale.set(1.15, 1.05, 1);
+  fairyRainbow.visible = false;
+  fairyWorld.add(fairyRainbow);
+  ["#fb7185", "#fbbf24", "#a3e635", "#38bdf8", "#c084fc"].forEach((color, index) => {
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(3.3 - index * 0.16, 0.09, 8, 64, Math.PI),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.78, side: THREE.DoubleSide }),
+    );
+    band.position.y = 5.4;
+    fairyRainbow.add(band);
+  });
+
   // 12. FLOATING PETALS & PARTICLES
   const petals = [];
   const petalMat = material("#f9a8d4", { roughness: 0.6, transparent: true, opacity: 0.9 });
@@ -738,6 +793,7 @@ export function createWorld(canvas, onFallback) {
     starry: new THREE.Group(),
     crystal: new THREE.Group(),
     dashain: new THREE.Group(),
+    fairy: new THREE.Group(),
   };
 
   Object.values(crowns).forEach((c) => crownSlots.add(c));
@@ -768,6 +824,12 @@ export function createWorld(canvas, onFallback) {
   for (let b = 0; b < 8; b += 1) {
     const a = (b / 8) * Math.PI * 2;
     addMesh(new THREE.SphereGeometry(0.09, 8, 8), b % 2 ? marigoldOrange : jamaraGreenMat, crowns.dashain, [Math.cos(a) * 0.28, 0.05, Math.sin(a) * 0.28]);
+  }
+
+  addMesh(new THREE.TorusGeometry(0.27, 0.035, 8, 24), goldMat, crowns.fairy).rotation.x = Math.PI / 2;
+  for (let gem = 0; gem < 5; gem += 1) {
+    const angle = (gem / 5) * Math.PI * 2;
+    addMesh(new THREE.OctahedronGeometry(0.09, 0), gem % 2 ? foliagePink : windowGlow, crowns.fairy, [Math.cos(angle) * 0.27, 0.12 + (gem === 0 ? 0.12 : 0), Math.sin(angle) * 0.27]);
   }
 
   // Active Crown helper
@@ -836,7 +898,7 @@ export function createWorld(canvas, onFallback) {
   // ANIMATION & PROXIMITY CONTROLS
   // =========================================================================
   const character = { group: princess, arms: armPivots, legs: legPivots, jumping: 0, phase: 0 };
-  let pointerDown = false;
+  let cameraPointerId = null;
   let previousX = 0;
   let targetRotation = 0;
   let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -883,33 +945,64 @@ export function createWorld(canvas, onFallback) {
   const dashainSunLight = new THREE.Color("#ffb852");
 
   const effectState = { diya: 0, gesture: 0, petalBurst: 0, kariGreeting: 0 };
+  const fairySpellEffects = [];
+  const disposeFairySpellEffect = (effect) => {
+    scene.remove(effect.group);
+    effect.group.traverse((object) => {
+      object.geometry?.dispose();
+      if (Array.isArray(object.material)) object.material.forEach((item) => item.dispose());
+      else object.material?.dispose();
+    });
+  };
   rememberOpacity(dashainWorld, 0);
   const start = performance.now();
 
+  let lastWidth = 0;
+  let lastHeight = 0;
+  let lastPixelRatio = 0;
+  let lastFov = 0;
   const resize = () => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, width < 700 ? 1.2 : 1.7));
-    renderer.shadowMap.enabled = width >= 700;
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.fov = width < 700 ? 56 : 46;
-    camera.updateProjectionMatrix();
+    const bounds = canvas.getBoundingClientRect();
+    const width = Math.round(bounds.width || window.innerWidth);
+    const height = Math.round(bounds.height || window.innerHeight);
+    if (!width || !height) return;
+    const pixelRatio = getPixelRatio(width);
+    const fov = width < 700 ? (width > height ? 50 : 62) : 46;
+    if (pixelRatio !== lastPixelRatio) {
+      renderer.setPixelRatio(pixelRatio);
+      lastPixelRatio = pixelRatio;
+    }
+    renderer.shadowMap.enabled = width >= 700 && !touchOptimized;
+    if (width !== lastWidth || height !== lastHeight) {
+      renderer.setSize(width, height, false);
+      lastWidth = width;
+      lastHeight = height;
+    }
+    if (camera.aspect !== width / height || camera.fov !== fov) {
+      camera.aspect = width / height;
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
   };
+  const canvasResizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
+  canvasResizeObserver?.observe(canvas);
 
   const down = (event) => {
-    pointerDown = true;
+    if (cameraPointerId !== null || (event.pointerType === "mouse" && event.button !== 0)) return;
+    cameraPointerId = event.pointerId;
     previousX = event.clientX;
     canvas.setPointerCapture?.(event.pointerId);
   };
 
   const move = (event) => {
-    if (!pointerDown) return;
+    if (cameraPointerId !== event.pointerId) return;
     targetRotation = THREE.MathUtils.clamp(targetRotation + (event.clientX - previousX) * 0.002, -0.32, 0.32);
     previousX = event.clientX;
   };
 
-  const up = () => { pointerDown = false; };
+  const up = (event) => {
+    if (cameraPointerId === event.pointerId) cameraPointerId = null;
+  };
 
   const movementKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"]);
   const keyDown = (event) => {
@@ -937,16 +1030,20 @@ export function createWorld(canvas, onFallback) {
     inputState.joystickX = 0;
     inputState.joystickY = 0;
     inputState.run = false;
+    cameraPointerId = null;
   };
 
   canvas.addEventListener("pointerdown", down);
   canvas.addEventListener("pointermove", move);
   canvas.addEventListener("pointerup", up);
   canvas.addEventListener("pointercancel", up);
+  canvas.addEventListener("lostpointercapture", up);
   window.addEventListener("keydown", keyDown);
   window.addEventListener("keyup", keyUp);
   window.addEventListener("blur", clearKeys);
   window.addEventListener("resize", resize);
+  window.visualViewport?.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", resize);
   resize();
 
   document.getElementById("world-loading").classList.add("is-ready");
@@ -1006,6 +1103,12 @@ export function createWorld(canvas, onFallback) {
       for (const [id, s] of Object.entries(questStars)) {
         if (!s.collected && Math.hypot(px - s.x, pz - s.z) < 2.4) {
           proximityCallback({ type: "star", id, title: s.title || "Collect Golden Star ⭐", actionLabel: "COLLECT STAR ⭐", icon: "⭐" });
+          return;
+        }
+      }
+      for (const [id, crystal] of Object.entries(fairyCrystals)) {
+        if (!crystal.collected && Math.hypot(px - crystal.x, pz - crystal.z) < 2.2) {
+          proximityCallback({ type: "fairy_crystal", id, title: `Discover ${crystal.title} 💎`, actionLabel: "DISCOVER CRYSTAL 💎", icon: "💎" });
           return;
         }
       }
@@ -1108,6 +1211,14 @@ export function createWorld(canvas, onFallback) {
           st.group.position.y = 1.3 + Math.sin(time * 2.5 + i) * 0.18;
         }
       });
+      Object.values(fairyCrystals).forEach((crystal) => {
+        if (!crystal.collected) {
+          crystal.core.rotation.y = time * 0.8 + crystal.index;
+          crystal.group.position.y = 0.08 + Math.sin(time * 2 + crystal.index) * 0.08;
+          crystal.halo.rotation.z = time * 0.35;
+        }
+      });
+      if (fairyRainbow.visible) fairyRainbow.rotation.z = Math.sin(time * 0.32) * 0.012;
 
       // Floating Petals
       petals.forEach((p) => {
@@ -1248,6 +1359,32 @@ export function createWorld(canvas, onFallback) {
         camera.lookAt(targetRotation * 2.5, defaultLookY, defaultLookZ);
       }
     }
+    for (let index = fairySpellEffects.length - 1; index >= 0; index -= 1) {
+      const effect = fairySpellEffects[index];
+      effect.life -= delta;
+      const positions = effect.geometry.attributes.position;
+      for (let particle = 0; particle < effect.velocities.length; particle += 1) {
+        const velocity = effect.velocities[particle];
+        positions.setXYZ(
+          particle,
+          positions.getX(particle) + velocity.x * delta,
+          positions.getY(particle) + velocity.y * delta,
+          positions.getZ(particle) + velocity.z * delta,
+        );
+        velocity.y -= delta * 0.35;
+      }
+      positions.needsUpdate = true;
+      effect.points.material.opacity = Math.max(0, effect.life / effect.duration);
+      effect.group.rotation.y += delta * 0.25;
+      effect.rings.forEach((ring, ringIndex) => {
+        ring.scale.setScalar(0.55 + (1 - effect.life / effect.duration) * (1.1 + ringIndex * 0.08));
+        ring.material.opacity = Math.max(0, effect.life / effect.duration) * 0.72;
+      });
+      if (effect.life <= 0) {
+        disposeFairySpellEffect(effect);
+        fairySpellEffects.splice(index, 1);
+      }
+    }
     renderer.render(scene, camera);
 
     if (!document.hidden) frameId = requestAnimationFrame(animate);
@@ -1257,6 +1394,7 @@ export function createWorld(canvas, onFallback) {
 
   const onVisibilityChange = () => {
     if (document.hidden) {
+      clearKeys();
       if (frameId !== null) cancelAnimationFrame(frameId);
       frameId = null;
     } else if (frameId === null) {
@@ -1288,6 +1426,70 @@ export function createWorld(canvas, onFallback) {
         effectState.kariGreeting = 2.5;
       }
     },
+    castFairySpell(spell) {
+      const palettes = {
+        blossom: ["#f472b6", "#fbcfe8", "#f9a8d4"],
+        stardust: ["#facc15", "#fff1a8", "#f5b942"],
+        flight: ["#67e8f9", "#c4b5fd", "#fde68a"],
+        rainbow: ["#fb7185", "#fbbf24", "#a3e635", "#38bdf8", "#c084fc"],
+        heart: ["#fb7185", "#f9a8d4", "#fecdd3"],
+      };
+      const palette = palettes[spell];
+      if (!palette) return;
+
+      if (spell === "flight") effectState.kariGreeting = 3;
+      if (fairySpellEffects.length >= 3) disposeFairySpellEffect(fairySpellEffects.shift());
+
+      const group = new THREE.Group();
+      group.position.copy(princess.position);
+      group.position.y += 0.8;
+      const particleCount = 24;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+      const velocities = [];
+      for (let index = 0; index < particleCount; index += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 0.35;
+        positions.set([Math.cos(angle) * radius, Math.random() * 0.8, Math.sin(angle) * radius], index * 3);
+        const color = new THREE.Color(palette[index % palette.length]);
+        colors.set([color.r, color.g, color.b], index * 3);
+        velocities.push({
+          x: Math.cos(angle) * (0.8 + Math.random() * 1.2),
+          y: 0.7 + Math.random() * 1.8,
+          z: Math.sin(angle) * (0.8 + Math.random() * 1.2),
+        });
+      }
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial({
+        size: spell === "heart" ? 0.24 : 0.19,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        sizeAttenuation: true,
+      }));
+      group.add(points);
+
+      const rings = [];
+      if (spell === "rainbow") {
+        group.position.y += 1.8;
+        group.position.z -= 2.5;
+        palette.forEach((color, index) => {
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(2.6 + index * 0.16, 0.055, 6, 48, Math.PI),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, side: THREE.DoubleSide }),
+          );
+          ring.position.y = 0.2;
+          ring.position.z = -0.5;
+          group.add(ring);
+          rings.push(ring);
+        });
+      }
+      scene.add(group);
+      fairySpellEffects.push({ group, geometry, points, velocities, rings, life: 1.8, duration: 1.8 });
+    },
     // Princess Customizer
     setPrincessOutfit(id) {
       const mat = outfitMaterials[id] ?? outfitMaterials.royal;
@@ -1310,6 +1512,12 @@ export function createWorld(canvas, onFallback) {
       if (!st || st.collected) return;
       st.collected = true;
       st.group.visible = false;
+    },
+    collectFairyCrystal(id) {
+      const crystal = fairyCrystals[id];
+      if (!crystal || crystal.collected) return;
+      crystal.collected = true;
+      crystal.group.visible = false;
     },
     // Dashain Courtyard Objects
     lightDiya(id) {
@@ -1345,6 +1553,15 @@ export function createWorld(canvas, onFallback) {
         st.collected = false;
         if (st.group) st.group.visible = true;
       });
+    },
+    resetFairyCrystals() {
+      Object.values(fairyCrystals).forEach((crystal) => {
+        crystal.collected = false;
+        crystal.group.visible = true;
+      });
+    },
+    setFairyRainbowRestored(isRestored) {
+      fairyRainbow.visible = Boolean(isRestored);
     },
     resetDiyas() {
       Object.values(diyas).forEach((d) => {
@@ -1394,6 +1611,9 @@ export function createWorld(canvas, onFallback) {
     getStarsList() {
       return Object.entries(questStars).map(([id, s]) => ({ id, x: s.x, y: s.y, z: s.z, collected: Boolean(s.collected), title: s.title }));
     },
+    getFairyCrystalsList() {
+      return Object.entries(fairyCrystals).map(([id, crystal]) => ({ id, x: crystal.x, z: crystal.z, collected: Boolean(crystal.collected), title: crystal.title }));
+    },
     getDiyasList() {
       return Object.entries(diyas).map(([id, d]) => ({ id, x: d.x, y: d.y, z: d.z, lit: Boolean(d.lit), title: d.title }));
     },
@@ -1423,12 +1643,16 @@ export function createWorld(canvas, onFallback) {
     dispose() {
       if (frameId !== null) cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
+      window.visualViewport?.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", resize);
+      canvasResizeObserver?.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", clearKeys);
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", up);
+      canvas.removeEventListener("lostpointercapture", up);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
       scene.traverse((object) => {

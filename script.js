@@ -61,7 +61,7 @@ function saveObject(key, obj) {
   } catch {}
 }
 
-const openedGifts = loadSavedSet("yunisha_opened_gifts");
+const openedGifts = new Set([...loadSavedSet("yunisha_opened_gifts")].filter((index) => Number.isInteger(index) && index >= 0 && index < 10));
 const foundTreasures = loadSavedSet("yunisha_dashain_treasures");
 const bloomedFlowers = loadSavedSet("yunisha_bloomed_flowers");
 const unlockedAchievements = loadSavedSet("yunisha_achievements");
@@ -69,6 +69,17 @@ const collectedStars = loadSavedSet("yunisha_collected_stars");
 const litDiyas = loadSavedSet("yunisha_lit_diyas");
 const placedMarigolds = loadSavedSet("yunisha_placed_marigolds");
 const visitedLandmarks = loadSavedSet("yunisha_visited_landmarks");
+const gardenDashainDiscoveries = loadSavedSet("yunisha_garden_dashain_discoveries");
+const celestialDiscoveries = new Set([...loadSavedSet("yunisha_celestial_discoveries")].filter((id) => ["dream_planet", "moon_garden", "sister_star"].includes(id)));
+const savedFairyQuest = loadSavedObject("yunisha_lost_fairy_quest", {}) || {};
+const fairyQuestProgress = {
+  flowers: new Set(Array.isArray(savedFairyQuest.flowers) ? savedFairyQuest.flowers.filter((id) => ["rose", "lily", "lotus", "orchid", "marigold"].includes(id)) : []),
+  crystals: new Set(Array.isArray(savedFairyQuest.crystals) ? savedFairyQuest.crystals.filter((id) => ["crystal_1", "crystal_2", "crystal_3"].includes(id)) : []),
+  mirrorBlessing: ["Kindness", "Courage", "Imagination", "Happiness"].includes(savedFairyQuest.mirrorBlessing) ? savedFairyQuest.mirrorBlessing : "",
+  rainbowRestored: savedFairyQuest.rainbowRestored === true,
+  completed: savedFairyQuest.completed === true,
+  rewardGranted: savedFairyQuest.rewardGranted === true,
+};
 let xp = parseInt(localStorage.getItem("yunisha_xp") || "0", 10);
 let activeQuestId = localStorage.getItem("yunisha_active_quest") || "quest_1";
 let wardrobeVisited = localStorage.getItem("yunisha_wardrobe_visited") === "true";
@@ -97,7 +108,19 @@ let portalEntered = false;
 let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let activeProximityTarget = null;
 let starConstellationConnected = new Set();
-let princessBlessed = false;
+let gardenSurpriseShown = sessionStorage.getItem("yunisha_garden_surprise") === "true";
+
+function saveFairyQuestProgress() {
+  saveObject("yunisha_lost_fairy_quest", {
+    flowers: [...fairyQuestProgress.flowers],
+    crystals: [...fairyQuestProgress.crystals],
+    mirrorBlessing: fairyQuestProgress.mirrorBlessing,
+    rainbowRestored: fairyQuestProgress.rainbowRestored,
+    completed: fairyQuestProgress.completed,
+    rewardGranted: fairyQuestProgress.rewardGranted,
+  });
+}
+let princessBlessed = localStorage.getItem("yunisha_princess_blessed") === "true";
 let welcomeKari = null;
 
 // =========================================================================
@@ -158,14 +181,15 @@ function addXP(amount, reason = "") {
 }
 
 // =========================================================================
-// 12 UNIQUE ACHIEVEMENTS SYSTEM
+// ACHIEVEMENTS SYSTEM
 // =========================================================================
 const achievementsList = [
   { id: "first_step", title: "First Royal Steps", icon: "🏰", desc: "Enter Princess Yunisha's magical kingdom." },
   { id: "first_gift", title: "Precious Keepsake", icon: "🎁", desc: "Open your first sisterly keepsake gift." },
   { id: "all_gifts", title: "Heart of Gold", icon: "💖", desc: "Open all 10 loving gifts from Didi." },
-  { id: "flower_whisper", title: "Enchanted Botanist", icon: "🌸", desc: "Help the magic blossoms in the garden bloom." },
+  { id: "flower_whisper", title: "Enchanted Botanist", icon: "🌸", desc: "Help all five magic blossoms in the garden bloom." },
   { id: "star_gazer", title: "Constellation Chaser", icon: "✨", desc: "Connect stars in the Star Observatory." },
+  { id: "starlight_princess", title: "Starlight Princess", icon: "🌟", desc: "Complete the Sister Heart Constellation in the correct order." },
   { id: "star_seeker", title: "Star Collector", icon: "⭐", desc: "Collect all 3 golden quest stars in the 3D kingdom." },
   { id: "first_treasure", title: "Dashain Seeker", icon: "🔍", desc: "Uncover your first hidden Dashain treasure." },
   { id: "treasure_master", title: "Master of Dashain Magic", icon: "🏆", desc: "Collect all 3 sacred Dashain treasures." },
@@ -320,13 +344,37 @@ const storyQuests = [
     getProgress: () => ({ current: Math.min(placedMarigolds.size, 3), total: 3, label: "Garlands placed" }),
     hint: "Kari: Approach the 3 vermilion toran pillars in the courtyard and press E to hang the festive garlands!"
   },
+  {
+    id: "fairy_kingdom",
+    tag: "Optional Quest",
+    title: "The Lost Fairy Kingdom",
+    nepali: "हराएको परी राज्य",
+    desc: "Awaken five flowers with wand magic, find three crystals, choose a mirror blessing, restore the rainbow, and complete the adventure.",
+    targetLocation: "simulations",
+    locationName: "Enchanted Garden",
+    targetCoords: { x: -8, z: 2 },
+    rewardXP: 100,
+    rewardReward: "Fairy Princess Tiara 🧚",
+    optional: true,
+    checkCompleted: () => fairyQuestProgress.completed,
+    getProgress: () => ({
+      current: fairyQuestProgress.flowers.size
+        + fairyQuestProgress.crystals.size
+        + Number(Boolean(fairyQuestProgress.mirrorBlessing))
+        + Number(fairyQuestProgress.rainbowRestored)
+        + Number(fairyQuestProgress.completed),
+      total: 11,
+      label: "Fairy adventure steps",
+    }),
+    hint: "Kari: Open the Enchanted Garden quest panel. Wake each flower with a chosen wand spell, tap all three crystals, then visit the Castle mirror and restore the rainbow!"
+  },
 ];
 
 function getActiveQuest() {
   const current = storyQuests.find((q) => q.id === activeQuestId);
   if (current && !current.checkCompleted()) return current;
-  const next = storyQuests.find((q) => !q.checkCompleted());
-  return next || storyQuests[storyQuests.length - 1];
+  const next = storyQuests.find((q) => !q.optional && !q.checkCompleted());
+  return next || storyQuests.find((q) => !q.optional) || storyQuests[0];
 }
 
 function updateQuestHUD() {
@@ -764,6 +812,21 @@ function restartAdventureProgress(isFullReset = false) {
     foundTreasures.clear();
     openedGifts.clear();
     bloomedFlowers.clear();
+    gardenDashainDiscoveries.clear();
+    celestialDiscoveries.clear();
+    fairyQuestProgress.flowers.clear();
+    fairyQuestProgress.crystals.clear();
+    fairyQuestProgress.mirrorBlessing = "";
+    fairyQuestProgress.rainbowRestored = false;
+    fairyQuestProgress.completed = false;
+    fairyQuestProgress.rewardGranted = false;
+    saveFairyQuestProgress();
+    if (equippedWardrobe.crown === "fairy") {
+      equippedWardrobe.crown = "royal";
+      saveObject("yunisha_wardrobe", equippedWardrobe);
+      world?.setPrincessCrown("royal");
+    }
+    princessBlessed = false;
     festivalCelebrated = false;
     wardrobeVisited = false;
     unlockedAchievements.clear();
@@ -776,14 +839,19 @@ function restartAdventureProgress(isFullReset = false) {
     saveSet("yunisha_dashain_treasures", foundTreasures);
     saveSet("yunisha_opened_gifts", openedGifts);
     saveSet("yunisha_bloomed_flowers", bloomedFlowers);
+    saveSet("yunisha_garden_dashain_discoveries", gardenDashainDiscoveries);
+    saveSet("yunisha_celestial_discoveries", celestialDiscoveries);
     saveSet("yunisha_achievements", unlockedAchievements);
     localStorage.removeItem("yunisha_festival_celebrated");
+    localStorage.removeItem("yunisha_princess_blessed");
     localStorage.removeItem("yunisha_wardrobe_visited");
     localStorage.setItem("yunisha_xp", "0");
     updateHUD();
 
     // 3. Restore all 3D world objects
     world?.resetQuestStars();
+    world?.resetFairyCrystals();
+    world?.setFairyRainbowRestored(false);
     world?.resetDiyas();
     world?.resetMarigolds();
     world?.resetTreasures();
@@ -877,6 +945,8 @@ function handleProximityInteraction(target) {
     collectWorldTreasure(target.id);
   } else if (target.type === "star") {
     collectWorldStar(target.id);
+  } else if (target.type === "fairy_crystal") {
+    discoverFairyCrystal(target.id);
   } else if (target.type === "diya") {
     lightWorldDiya(target.id);
   } else if (target.type === "marigold_point") {
@@ -900,6 +970,22 @@ function handleProximityInteraction(target) {
   }
 }
 
+function discoverFairyCrystal(id) {
+  const crystalIds = ["crystal_1", "crystal_2", "crystal_3"];
+  if (!crystalIds.includes(id) || fairyQuestProgress.crystals.has(id)) return;
+  fairyQuestProgress.crystals.add(id);
+  saveFairyQuestProgress();
+  world?.collectFairyCrystal(id);
+  world?.castFairySpell?.("stardust");
+  soundManager.play("secret");
+  updateQuestHUD();
+  const found = fairyQuestProgress.crystals.size;
+  announce(`Fairy crystal discovered! ${found}/3 crystals found. 💎`);
+  kariSpeak(found === 3
+    ? "Every hidden fairy crystal is shining in your collection! Now choose a blessing in the Castle mirror. 🪞"
+    : `You found a fairy crystal! ${3 - found} more ${found === 2 ? "crystal" : "crystals"} are hidden around the Enchanted Garden path.`, 5500);
+}
+
 // =========================================================================
 // ROYAL KINGDOM MAP MODAL
 // =========================================================================
@@ -910,7 +996,7 @@ function renderKingdomMap() {
     { id: "gifts", name: "Hall of Gifts", icon: "✧", coords: { x: 6, z: 2 }, desc: "Ten meaningful sisterly keepsake treasures from Didi.", theme: "FAIRY_WORLD" },
     { id: "gallery", name: "Moonlight Lake & Gallery", icon: "♡", coords: { x: -7, z: -7.5 }, desc: "Real sister and family photos glowing under moonlight.", theme: "FAIRY_WORLD" },
     { id: "dashain", name: "Dashain Courtyard", icon: "❁", coords: { x: 0, z: 0 }, desc: "Treasure Hunt, 3D Diyas, Marigolds, Tika & Jamara.", theme: "DASHAIN_WORLD" },
-    { id: "observatory", name: "Star Observatory", icon: "☾", coords: { x: 8, z: -4 }, desc: "Star constellations, celestial sky & sparkling wishes.", theme: "FAIRY_WORLD" },
+    { id: "observatory", name: "Star Observatory", icon: "☾", coords: { x: 8, z: 4 }, desc: "Star constellations, celestial sky & sparkling wishes.", theme: "FAIRY_WORLD" },
     { id: "secret", name: "Secret Rose Doorway", icon: "🗝️", coords: { x: -6.5, z: -8.5 }, desc: "Hidden sanctuary of peace, kindness & Durga blessing.", theme: "FAIRY_WORLD" },
   ];
 
@@ -1038,6 +1124,11 @@ function renderQuestsModal() {
                     Find Golden Stars ⭐
                   </button>
                 ` : ""}
+                ${!completed && q.id === "fairy_kingdom" ? `
+                  <button class="secondary-button" type="button" data-quest-start-fairy>
+                    Enter Fairy Garden 🧚
+                  </button>
+                ` : ""}
                 ${!completed ? `
                   <button class="button button-gold" type="button" data-quest-track="${q.id}">
                     ${isActive ? "Currently Tracking ✓" : "Track Quest ✦"}
@@ -1107,6 +1198,14 @@ function renderQuestsModal() {
     });
   });
 
+  modalRoot.querySelector("[data-quest-start-fairy]")?.addEventListener("click", () => {
+    activeQuestId = "fairy_kingdom";
+    localStorage.setItem("yunisha_active_quest", activeQuestId);
+    updateQuestHUD();
+    openModal("simulations");
+    requestAnimationFrame(() => modalRoot.querySelector("#lost-fairy-quest")?.scrollIntoView({ block: "start", behavior: reducedMotion ? "instant" : "smooth" }));
+  });
+
   modalRoot.querySelectorAll("[data-quest-track]").forEach((btn) => {
     btn.addEventListener("click", () => {
       activeQuestId = btn.dataset.questTrack;
@@ -1145,6 +1244,7 @@ function renderCustomizationStudio() {
     { id: "starry", name: "Starry Night Diadem", icon: "⭐", desc: "Formed from three falling stars collected in the kingdom.", unlocked: collectedStars.size >= 3 },
     { id: "crystal", name: "Crystal Ice Tiara", icon: "💎", desc: "Awarded to princesses reaching Level 3 Kindness Weaver.", unlocked: getLevelInfo(xp).level >= 3 },
     { id: "dashain", name: "Dashain Golden Mukut", icon: "🌺", desc: "The sacred festive crown blessed by Dashain traditions.", unlocked: foundTreasures.size >= 3 },
+    { id: "fairy", name: "Fairy Princess Tiara", icon: "🧚", desc: "A delicate tiara awarded for restoring the Lost Fairy Kingdom.", unlocked: fairyQuestProgress.completed },
   ];
 
   const trails = [
@@ -1560,11 +1660,18 @@ function renderPrincess() {
             <span class="activity-icon">✨</span>
             <div>
               <h3>Magic Wand of Sparkles</h3>
-              <p>Wave your golden wand to release starbursts across the kingdom.</p>
+              <p>Choose a spell and send its magic through the kingdom.</p>
             </div>
           </div>
-          <button class="secondary-button" id="wave-wand-btn" type="button">Wave Magic Wand 🪄</button>
+          <div class="royal-spell-grid" role="group" aria-label="Choose a wand spell">
+            <button class="secondary-button" type="button" data-royal-spell="blossom">Blossom Magic 🌸</button>
+            <button class="secondary-button" type="button" data-royal-spell="stardust">Stardust ✨</button>
+            <button class="secondary-button" type="button" data-royal-spell="flight">Fairy Flight 🦋</button>
+            <button class="secondary-button" type="button" data-royal-spell="rainbow">Rainbow 🌈</button>
+            <button class="secondary-button" type="button" data-royal-spell="heart">Heart of Magic 💗</button>
+          </div>
           <div id="wand-stars-stage" class="wand-stars-stage" aria-hidden="true"></div>
+          <p id="wand-spell-feedback" class="small-note" aria-live="polite">Choose a spell to begin.</p>
         </div>
 
         <div class="castle-activity-card">
@@ -1572,10 +1679,15 @@ function renderPrincess() {
             <span class="activity-icon">🪞</span>
             <div>
               <h3>Magic Mirror of Truth</h3>
-              <p>Ask the mirror what it sees in Princess Yunisha.</p>
+              <p>Choose a little truth for your heart to remember.</p>
             </div>
           </div>
-          <button class="secondary-button" id="ask-mirror-btn" type="button">Look into Mirror 🪞</button>
+          <div class="royal-mirror-choices" role="group" aria-label="Choose a mirror blessing">
+            <button class="pill-button" type="button" data-mirror-choice="Kindness">Kindness</button>
+            <button class="pill-button" type="button" data-mirror-choice="Courage">Courage</button>
+            <button class="pill-button" type="button" data-mirror-choice="Imagination">Imagination</button>
+            <button class="pill-button" type="button" data-mirror-choice="Happiness">Happiness</button>
+          </div>
           <p id="mirror-reflection" class="compliment"></p>
         </div>
       </div>
@@ -1594,45 +1706,58 @@ function renderPrincess() {
   crownBtn.addEventListener("click", () => {
     if (!princessBlessed) addXP(40, "Princess Blessing");
     princessBlessed = true;
+    localStorage.setItem("yunisha_princess_blessed", "true");
+    crownBtn.classList.add("crown-ceremony-complete");
     soundManager.play("fanfare");
     world?.interact("blessing");
     blessingText.textContent = "May your days always be filled with kindness, courage, laughter, and magical dreams, Princess Yunisha!";
     announce("A golden royal blessing for Princess Yunisha! 👑✨");
   });
 
-  const waveBtn = modalRoot.querySelector("#wave-wand-btn");
   const wandStage = modalRoot.querySelector("#wand-stars-stage");
-  waveBtn.addEventListener("click", () => {
-    soundManager.play("sparkle");
-    world?.interact("sparkle");
-    addXP(15, "Waved Magic Wand");
+  const spellFeedback = modalRoot.querySelector("#wand-spell-feedback");
+  const spellCopy = {
+    blossom: { message: "Blossom magic sends pink petals dancing through the castle!", symbols: ["🌸", "🌺", "🌼"], sound: "bloom", effect: "celebration" },
+    stardust: { message: "Golden stardust twinkles around the kingdom!", symbols: ["✨", "⭐", "💫"], sound: "sparkle", effect: "celebration" },
+    flight: { message: "Kari flutters beside you on a little fairy flight!", symbols: ["🦋", "🦋", "✨"], sound: "wish", effect: "kari_greet" },
+    rainbow: { message: "A rainbow shimmer fills the royal sky!", symbols: ["🌈", "✨", "🌈"], sound: "secret", effect: "celebration" },
+    heart: { message: "A warm heart of magic glows around the princess!", symbols: ["💗", "💖", "💕"], sound: "wish", effect: "blessing" },
+  };
+  modalRoot.querySelectorAll("[data-royal-spell]").forEach((spellButton) => spellButton.addEventListener("click", () => {
+    const spell = spellCopy[spellButton.dataset.royalSpell];
+    if (!spell) return;
+    soundManager.play(spell.sound);
+    world?.interact(spell.effect);
+    world?.castFairySpell?.(spellButton.dataset.royalSpell);
     wandStage.innerHTML = "";
-    for (let i = 0; i < 12; i += 1) {
+    wandStage.dataset.spell = spellButton.dataset.royalSpell;
+    for (let i = 0; i < 15; i += 1) {
       const star = document.createElement("span");
       star.className = "floating-wand-star";
-      star.textContent = ["✨", "⭐", "✦", "💫"][i % 4];
+      star.textContent = spell.symbols[i % spell.symbols.length];
       star.style.left = `${10 + Math.random() * 80}%`;
       star.style.top = `${Math.random() * 80}%`;
       wandStage.appendChild(star);
     }
-    announce("You waved your wand! Magical sparkles filled the castle.");
-  });
+    spellFeedback.textContent = spell.message;
+    announce(spell.message);
+  }));
 
-  const mirrorBtn = modalRoot.querySelector("#ask-mirror-btn");
   const mirrorText = modalRoot.querySelector("#mirror-reflection");
-  const reflections = [
-    "The mirror reflects: A kind, thoughtful, and brave girl whose smile brightens every room.",
-    "The mirror reflects: An adventurous princess with endless curiosity and an artistic spirit.",
-    "The mirror reflects: A beloved little sister who is cherished more than all the kingdom's gold.",
-    "The mirror reflects: A bright star who will achieve wonderful and meaningful things in life.",
-  ];
-  let mirrorIndex = 0;
-  mirrorBtn.addEventListener("click", () => {
+  const mirrorBlessings = {
+    Kindness: "Your kind heart makes the world gentler and brighter.",
+    Courage: "You can be brave, one small step and one big dream at a time.",
+    Imagination: "Your imagination can turn every day into a wonderful adventure.",
+    Happiness: "Your smile brings sunshine to the people who love you.",
+  };
+  modalRoot.querySelectorAll("[data-mirror-choice]").forEach((choice) => choice.addEventListener("click", () => {
+    const value = choice.dataset.mirrorChoice;
     soundManager.play("wish");
-    addXP(15, "Looked into Mirror");
-    mirrorText.textContent = reflections[mirrorIndex % reflections.length];
-    mirrorIndex += 1;
-  });
+    world?.interact("blessing");
+    fairyQuestProgress.mirrorBlessing = value;
+    saveFairyQuestProgress();
+    mirrorText.textContent = `The mirror sees a thoughtful princess. ${mirrorBlessings[value]}`;
+  }));
 
   modalRoot.querySelectorAll("[data-open]").forEach((btn) => {
     btn.addEventListener("click", () => openModal(btn.dataset.open));
@@ -1650,6 +1775,7 @@ function renderSimulations() {
     { id: "orchid", name: "Violet Orchid of Dreams", color: "#c084fc", icon: "🌸", blessing: "May your deepest dreams and hopes take joyful flight." },
     { id: "marigold", name: "Sweet Marigold of Joy", color: "#fb923c", icon: "🌺", blessing: "May festival cheer and laughter accompany every single step." },
   ];
+  let surpriseTimer = null;
 
   modalShell(`
     <p class="modal-eyebrow">Where Magic & Nature Bloom ❀</p>
@@ -1675,17 +1801,90 @@ function renderSimulations() {
           `;
         }).join("")}
       </div>
+      ${bloomedFlowers.size === gardenFlowers.length
+        ? `<button class="flower-bloom-card secret-flower-card" id="secret-garden-flower" type="button"><span class="flower-icon">✨</span><strong>Fairy Star of Secrets</strong><small class="flower-status">A hidden bloom is ready!</small></button>`
+        : `<p class="small-note secret-flower-hint">A tiny golden secret may appear when every flower has bloomed…</p>`}
       <p id="garden-blessing-display" class="compliment" aria-live="polite">Choose a flower to discover its blessing.</p>
     </div>
+
+    <section class="garden-dashain-discoveries" aria-labelledby="garden-dashain-title">
+      <div class="row-between">
+        <h3 class="section-title" id="garden-dashain-title">Dashain Garden Treasures</h3>
+        <span class="badge-counter" id="garden-dashain-count">Found: ${gardenDashainDiscoveries.size}/3</span>
+      </div>
+      <p class="small-note">Tap each keepsake to discover a little Dashain tradition. These are separate from courtyard quests.</p>
+      <div class="garden-discovery-grid">
+        <button type="button" class="pill-button" data-garden-discovery="jamara">${gardenDashainDiscoveries.has("jamara") ? "✓ " : ""}🌱 Sacred Jamara</button>
+        <button type="button" class="pill-button" data-garden-discovery="diya">${gardenDashainDiscoveries.has("diya") ? "✓ " : ""}🪔 Festival Diya</button>
+        <button type="button" class="pill-button" data-garden-discovery="garland">${gardenDashainDiscoveries.has("garland") ? "✓ " : ""}🌼 Marigold Garland</button>
+      </div>
+      <p id="garden-discovery-message" class="compliment" aria-live="polite">${gardenDashainDiscoveries.size === 3 ? "शुभ दशैं! May love, light, and happiness bless your whole family. 🌼" : "Three gentle discoveries are waiting."}</p>
+    </section>
+
+    <details class="fairy-quest-panel" id="lost-fairy-quest" ${activeQuestId === "fairy_kingdom" ? "open" : ""}>
+      <summary>
+        <span><strong>Optional Quest: The Lost Fairy Kingdom 🧚</strong><small>Restore the fairy garden through real discoveries.</small></span>
+        <span class="badge-counter" id="fairy-quest-count">Steps: ${fairyQuestProgress.flowers.size + fairyQuestProgress.crystals.size + Number(Boolean(fairyQuestProgress.mirrorBlessing)) + Number(fairyQuestProgress.rainbowRestored) + Number(fairyQuestProgress.completed)}/11</span>
+      </summary>
+      <div class="fairy-quest-content">
+        <p class="small-note">Choose a wand spell for each flower, discover all three crystals, then choose a blessing in the Castle mirror and restore the rainbow.</p>
+        <label class="control-label" for="fairy-quest-spell">Wand spell for the next flower</label>
+        <select class="select-control" id="fairy-quest-spell">
+          <option value="blossom">Blossom Magic 🌸</option>
+          <option value="stardust">Stardust ✨</option>
+          <option value="flight">Fairy Flight 🦋</option>
+          <option value="rainbow">Rainbow Magic 🌈</option>
+          <option value="heart">Heart of Magic 💗</option>
+        </select>
+        <div class="fairy-quest-flower-grid">
+          ${gardenFlowers.map((flower) => `
+            <button type="button" class="pill-button ${fairyQuestProgress.flowers.has(flower.id) ? "is-complete" : ""}" data-fairy-quest-flower="${flower.id}" ${fairyQuestProgress.flowers.has(flower.id) ? "disabled" : ""}>
+              ${fairyQuestProgress.flowers.has(flower.id) ? "✓ " : "✧ "}${flower.icon} Awaken ${flower.name}
+            </button>
+          `).join("")}
+        </div>
+        <div class="fairy-quest-crystals">
+          <strong>3D crystal discoveries: <span id="fairy-crystal-count">${fairyQuestProgress.crystals.size}/3 found</span></strong>
+          <p class="small-note">Explore the Enchanted Garden in the 3D kingdom. Look near the moonlit garden path, rose beds, and lily pond; walk close and tap Discover Crystal.</p>
+        </div>
+        <div class="fairy-quest-actions">
+          <button class="secondary-button" type="button" data-open="princess">Choose a blessing in the Magic Mirror 🪞${fairyQuestProgress.mirrorBlessing ? ` ✓ ${fairyQuestProgress.mirrorBlessing}` : ""}</button>
+          <button class="secondary-button" type="button" id="fairy-quest-rainbow" ${fairyQuestProgress.flowers.size < 5 || fairyQuestProgress.crystals.size < 3 || !fairyQuestProgress.mirrorBlessing || fairyQuestProgress.rainbowRestored ? "disabled" : ""}>${fairyQuestProgress.rainbowRestored ? "Rainbow restored ✓" : "Restore the Rainbow 🌈"}</button>
+          <button class="button button-gold" type="button" id="fairy-quest-complete" ${!fairyQuestProgress.rainbowRestored || fairyQuestProgress.completed ? "disabled" : ""}>${fairyQuestProgress.completed ? "Fairy adventure complete ✓" : "Complete Fairy Adventure ✨"}</button>
+        </div>
+        <p class="compliment" id="fairy-quest-message" aria-live="polite">${fairyQuestProgress.completed ? "The Lost Fairy Kingdom is shining again! Your Fairy Princess Tiara is ready in the wardrobe. 👑" : "Kari: The five flowers, three crystals, Castle mirror, and rainbow are all waiting for your magic."}</p>
+        <button class="pill-button" type="button" id="fairy-quest-hint">Ask Kari for a location-aware hint 🦋</button>
+      </div>
+    </details>
+
+    <details class="fairy-rescue-panel">
+      <summary><strong>Mini-game: Fairy Garden Rescue 🦋</strong><small>Guide each tiny light to its matching flower.</small></summary>
+      <p class="small-note">Tap a fairy light, then tap the flower with the same colour. Match all five to help Kari!</p>
+      <div class="rescue-light-row" role="group" aria-label="Fairy lights">
+        ${[["rose", "Pink", "🌹"], ["lily", "Golden", "🌼"], ["lotus", "Blue", "🪷"], ["orchid", "Violet", "🌸"], ["marigold", "Orange", "🌺"]].map(([id, color, icon]) => `<button type="button" class="rescue-light" data-rescue-light="${id}" aria-label="Select ${color} fairy light">${icon}<small>${color}</small></button>`).join("")}
+      </div>
+      <div class="rescue-flower-row" role="group" aria-label="Matching flowers">
+        ${gardenFlowers.map((flower) => `<button type="button" class="rescue-flower" data-rescue-flower="${flower.id}" aria-label="Match light to ${flower.name}">${flower.icon}<small>${flower.name.replace(/ of .*/, "")}</small></button>`).join("")}
+      </div>
+      <p class="compliment" id="rescue-message" aria-live="polite">Choose one fairy light, then its matching flower. Matches: 0/5</p>
+      <button type="button" class="secondary-button" id="rescue-replay">Replay Fairy Garden Rescue ↺</button>
+    </details>
+    <p class="garden-surprise-note" id="garden-surprise-note" aria-live="polite"></p>
 
     <h3 class="section-title">Magical Physics Laboratory 🪄</h3>
     <p class="modal-intro">Experiment with spell formations on the interactive magical canvas.</p>
     <div class="row simulation-tabs" role="group" aria-label="Choose a spell simulation">
       <button class="pill-button is-active" data-mode="orb">Particle orb</button>
-      <button class="pill-button" data-mode="wand">Magic wand</button>
-      <button class="pill-button" data-mode="flowers">Flower garden</button>
+      <button class="pill-button" data-mode="wand">Wand challenge</button>
+      <button class="pill-button" data-mode="dust">Catch fairy dust</button>
+      <button class="pill-button" data-mode="mixer">Rainbow mixer</button>
+      <button class="pill-button" data-mode="crystal">Crystal restoration</button>
+      <button class="pill-button" data-mode="pattern">Star mystery</button>
       <button class="pill-button" data-mode="orbit">Celestial orbit</button>
-      <button class="pill-button" data-mode="gravity">Floating magic</button>
+      <button class="pill-button" data-mode="gravity">Gravity simulation</button>
+      <button class="pill-button" data-mode="floating">Floating orb game</button>
+      <button class="pill-button" data-mode="laboratory">Secret spell lab</button>
+      <button class="pill-button" data-mode="flowers">Flower garden</button>
     </div>
     <div class="soft-panel" style="margin-top:14px">
       <div class="canvas-stage"><canvas class="simulation-canvas" aria-label="Interactive magical simulation"></canvas></div>
@@ -1705,19 +1904,215 @@ function renderSimulations() {
       if (!flower) return;
       if (!bloomedFlowers.has(id)) {
         addXP(25, "Bloomed Magic Flower");
-        unlockAchievement("flower_whisper");
       }
+      const firstBloom = !bloomedFlowers.has(id);
       bloomedFlowers.add(id);
       saveSet("yunisha_bloomed_flowers", bloomedFlowers);
+      if (bloomedFlowers.size === gardenFlowers.length) {
+        unlockAchievement("flower_whisper");
+        if (!modalRoot.querySelector("#secret-garden-flower")) {
+          const secretFlower = document.createElement("button");
+          secretFlower.className = "flower-bloom-card secret-flower-card";
+          secretFlower.id = "secret-garden-flower";
+          secretFlower.type = "button";
+          secretFlower.innerHTML = `<span class="flower-icon">✨</span><strong>Fairy Star of Secrets</strong><small class="flower-status">A hidden bloom is ready!</small>`;
+          modalRoot.querySelector(".secret-flower-hint")?.replaceWith(secretFlower);
+        }
+      }
       card.classList.add("is-bloomed");
+      card.style.setProperty("--flower-color", flower.color);
+      card.classList.remove("flower-bloom-burst");
+      void card.offsetWidth;
+      card.classList.add("flower-bloom-burst");
       card.querySelector(".flower-status").textContent = "Bloomed ✓";
       bouquetCount.textContent = `Bloomed: ${bloomedFlowers.size}/${gardenFlowers.length}`;
       blessingDisplay.textContent = `${flower.icon} ${flower.name}: "${flower.blessing}"`;
       soundManager.play("bloom");
-      world?.interact("sparkle");
+      world?.interact("celebration");
+      if (firstBloom) {
+        const kariReactions = {
+          rose: "The rose is blooming with all your love, Princess! 🌹",
+          lily: "Your golden lily is shining like a little sun! 🌼",
+          lotus: "The blue lotus is glowing with peaceful magic! 🪷",
+          orchid: "Dreams are twinkling in your violet orchid! 🌸",
+          marigold: "A sunny marigold for a joyful Dashain! 🌺",
+        };
+        kariSpeak(kariReactions[id], 3500);
+      }
       announce(`The ${flower.name} bloomed with magic! ✨`);
       updateQuestHUD();
     });
+  });
+
+  modalRoot.querySelector(".garden-walkthrough-section")?.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest("#secret-garden-flower")) return;
+    const secretFlower = event.target.closest("#secret-garden-flower");
+    secretFlower.classList.add("flower-bloom-burst");
+    blessingDisplay.textContent = "✨ Fairy Star of Secrets: What has roots but never grows, and keeps your Dashain memories safe? Your heart! Surprise—you make this garden magical. ✨";
+    soundManager.play("secret");
+    world?.triggerCelebration();
+    kariSpeak("You found the secret flower, Princess! Its golden light is all yours. ✨", 4500);
+  });
+
+  const dashainDiscoveryMessages = {
+    jamara: "Sacred Jamara is grown for Dashain and shared as a blessing for growth and good fortune.",
+    diya: "A Festival Diya brings a warm light of hope and welcome during Dashain.",
+    garland: "Marigold garlands brighten Dashain homes and celebrations with their sunny golden colour.",
+  };
+  modalRoot.querySelectorAll("[data-garden-discovery]").forEach((button) => button.addEventListener("click", () => {
+    const id = button.dataset.gardenDiscovery;
+    const isNewDiscovery = !gardenDashainDiscoveries.has(id);
+    gardenDashainDiscoveries.add(id);
+    saveSet("yunisha_garden_dashain_discoveries", gardenDashainDiscoveries);
+    button.textContent = `✓ ${button.textContent.replace(/^✓\s*/, "")}`;
+    modalRoot.querySelector("#garden-dashain-count").textContent = `Found: ${gardenDashainDiscoveries.size}/3`;
+    const message = modalRoot.querySelector("#garden-discovery-message");
+    if (gardenDashainDiscoveries.size === 3) {
+      message.textContent = "शुभ दशैं! May love, light, and happiness bless your whole family. 🌼";
+      if (isNewDiscovery) {
+        world?.triggerCelebration();
+        soundManager.play("celebrate");
+        kariSpeak("We discovered every Dashain garden treasure! शुभ दशैं! 🪔", 5000);
+      }
+    } else {
+      message.textContent = dashainDiscoveryMessages[id];
+      soundManager.play("wish");
+    }
+  }));
+
+  const updateFairyQuestCount = () => {
+    const count = fairyQuestProgress.flowers.size
+      + fairyQuestProgress.crystals.size
+      + Number(Boolean(fairyQuestProgress.mirrorBlessing))
+      + Number(fairyQuestProgress.rainbowRestored)
+      + Number(fairyQuestProgress.completed);
+    modalRoot.querySelector("#fairy-quest-count").textContent = `Steps: ${count}/11`;
+    modalRoot.querySelector("#fairy-crystal-count").textContent = `${fairyQuestProgress.crystals.size}/3 found`;
+  };
+  const fairyQuestMessage = modalRoot.querySelector("#fairy-quest-message");
+  const fairyQuestSpell = modalRoot.querySelector("#fairy-quest-spell");
+  const fairySpellNames = {
+    blossom: "Blossom Magic",
+    stardust: "Stardust",
+    flight: "Fairy Flight",
+    rainbow: "Rainbow Magic",
+    heart: "Heart of Magic",
+  };
+
+  modalRoot.querySelectorAll("[data-fairy-quest-flower]").forEach((button) => button.addEventListener("click", () => {
+    const flowerId = button.dataset.fairyQuestFlower;
+    if (fairyQuestProgress.flowers.has(flowerId)) return;
+    const spell = fairyQuestSpell.value;
+    fairyQuestProgress.flowers.add(flowerId);
+    saveFairyQuestProgress();
+    button.disabled = true;
+    button.classList.add("is-complete");
+    button.textContent = `✓ ${gardenFlowers.find((flower) => flower.id === flowerId)?.name || "Magical flower"} awakened`;
+    updateFairyQuestCount();
+    world?.castFairySpell?.(spell);
+    soundManager.play("bloom");
+    fairyQuestMessage.textContent = `${fairySpellNames[spell]} awakened a fairy flower! ${fairyQuestProgress.flowers.size}/5 blossoms are glowing.`;
+    if (fairyQuestProgress.flowers.size === 5) kariSpeak("All five fairy flowers are awake! The hidden crystals are waiting nearby. ✨", 4500);
+  }));
+
+  modalRoot.querySelector(".fairy-quest-panel [data-open='princess']")?.addEventListener("click", () => openModal("princess"));
+  modalRoot.querySelector("#fairy-quest-rainbow")?.addEventListener("click", (event) => {
+    if (fairyQuestProgress.flowers.size < 5 || fairyQuestProgress.crystals.size < 3 || !fairyQuestProgress.mirrorBlessing) return;
+    fairyQuestProgress.rainbowRestored = true;
+    saveFairyQuestProgress();
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = "Rainbow restored ✓";
+    modalRoot.querySelector("#fairy-quest-complete").disabled = false;
+    updateFairyQuestCount();
+    world?.setFairyRainbowRestored(true);
+    world?.castFairySpell?.("rainbow");
+    soundManager.play("celebrate");
+    fairyQuestMessage.textContent = "The rainbow shines across the Fairy Garden! One last step remains: complete the adventure.";
+    kariSpeak("The rainbow is back! Tap Complete Fairy Adventure to receive your tiara. 🌈", 5000);
+  });
+  modalRoot.querySelector("#fairy-quest-complete")?.addEventListener("click", (event) => {
+    if (!fairyQuestProgress.rainbowRestored || fairyQuestProgress.completed) return;
+    fairyQuestProgress.completed = true;
+    if (!fairyQuestProgress.rewardGranted) {
+      addXP(100, "Restored the Lost Fairy Kingdom");
+      fairyQuestProgress.rewardGranted = true;
+    }
+    saveFairyQuestProgress();
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = "Fairy adventure complete ✓";
+    updateFairyQuestCount();
+    fairyQuestMessage.textContent = "The Lost Fairy Kingdom is shining again! Your Fairy Princess Tiara is ready in the wardrobe. 👑";
+    soundManager.play("fanfare");
+    world?.triggerCelebration();
+    updateQuestHUD();
+    announce("The Lost Fairy Kingdom is restored! Fairy Princess Tiara unlocked! 🧚👑");
+  });
+  modalRoot.querySelector("#fairy-quest-hint")?.addEventListener("click", () => {
+    const position = world?.getPrincessPosition() || { x: 0, z: 0 };
+    let locationHint = "Open the Enchanted Garden quest panel to find the fairy flowers and crystals.";
+    if (Math.hypot(position.x + 8, position.z - 2) < 5) {
+      if (fairyQuestProgress.flowers.size < 5) locationHint = `Choose a wand spell and awaken a flower in the first row; ${5 - fairyQuestProgress.flowers.size} blossoms remain.`;
+      else if (fairyQuestProgress.crystals.size < 3) {
+        const remaining = (world?.getFairyCrystalsList?.() || []).filter((crystal) => !fairyQuestProgress.crystals.has(crystal.id));
+        remaining.sort((a, b) => Math.hypot(a.x - position.x, a.z - position.z) - Math.hypot(b.x - position.x, b.z - position.z));
+        const nextCrystal = remaining[0];
+        locationHint = nextCrystal
+          ? `Close the garden panel and follow the guide arrow to the ${nextCrystal.title}. Walk close and tap Discover Crystal; ${3 - fairyQuestProgress.crystals.size} remain.`
+          : "Explore the Enchanted Garden and look for glowing crystals.";
+      }
+      else if (!fairyQuestProgress.mirrorBlessing) locationHint = "Visit the Castle's Magic Mirror and choose one of its four blessings.";
+      else if (!fairyQuestProgress.rainbowRestored) locationHint = "The flowers, crystals, and mirror are ready; tap Restore the Rainbow.";
+      else locationHint = "The rainbow is back! Complete the adventure to claim your Fairy Princess Tiara.";
+    } else {
+      locationHint = "The fairy garden is near the Enchanted Garden landmark. Open it, then use the quest panel's flowers and crystal discoveries.";
+    }
+    kariSpeak(`Kari: ${locationHint}`, 6500);
+  });
+
+  let selectedRescueLight = "";
+  const rescuedFairies = new Set();
+  const rescueMessage = modalRoot.querySelector("#rescue-message");
+  modalRoot.querySelectorAll("[data-rescue-light]").forEach((button) => button.addEventListener("click", () => {
+    if (rescuedFairies.has(button.dataset.rescueLight)) return;
+    selectedRescueLight = button.dataset.rescueLight;
+    modalRoot.querySelectorAll("[data-rescue-light]").forEach((light) => light.classList.toggle("is-selected", light === button));
+    rescueMessage.textContent = `Guide the ${button.querySelector("small").textContent.toLowerCase()} fairy light to its matching flower. Matches: ${rescuedFairies.size}/5`;
+  }));
+  modalRoot.querySelectorAll("[data-rescue-flower]").forEach((button) => button.addEventListener("click", () => {
+    const flowerId = button.dataset.rescueFlower;
+    if (!selectedRescueLight || rescuedFairies.has(flowerId)) {
+      if (!selectedRescueLight) rescueMessage.textContent = "Choose a fairy light first.";
+      return;
+    }
+    if (selectedRescueLight !== flowerId) {
+      rescueMessage.textContent = "Not quite—follow the matching colours and try again.";
+      soundManager.play("click");
+      return;
+    }
+    rescuedFairies.add(flowerId);
+    button.disabled = true;
+    button.classList.add("is-rescued");
+    modalRoot.querySelector(`[data-rescue-light="${flowerId}"]`)?.classList.add("is-rescued");
+    selectedRescueLight = "";
+    modalRoot.querySelectorAll("[data-rescue-light]").forEach((light) => light.classList.remove("is-selected"));
+    if (rescuedFairies.size === 5) {
+      rescueMessage.textContent = "Every fairy light found its flower! The whole garden is blooming! 🌸";
+      soundManager.play("celebrate");
+      world?.triggerCelebration();
+      kariSpeak("You rescued every little fairy light! The garden is glowing because of you! 🦋", 4500);
+    } else {
+      rescueMessage.textContent = `A fairy light found its flower! Matches: ${rescuedFairies.size}/5`;
+      soundManager.play("bloom");
+    }
+  }));
+  modalRoot.querySelector("#rescue-replay")?.addEventListener("click", () => {
+    rescuedFairies.clear();
+    selectedRescueLight = "";
+    modalRoot.querySelectorAll("[data-rescue-light], [data-rescue-flower]").forEach((button) => {
+      button.disabled = false;
+      button.classList.remove("is-selected", "is-rescued");
+    });
+    rescueMessage.textContent = "Choose one fairy light, then its matching flower. Matches: 0/5";
   });
 
   // Canvas simulation setup
@@ -1725,9 +2120,19 @@ function renderSimulations() {
   const context = canvas?.getContext("2d");
   if (!context) return;
 
-  const state = { mode: "orb", formation: "spiral", intensity: 1, speed: 1, gravity: 0.6, paused: false, pointer: null, trail: [], pulses: [], flower: -1, orbitClock: 0, lastFrame: 0 };
+  const state = {
+    mode: "orb", formation: "spiral", intensity: 1, speed: 1, gravity: 0.6, paused: false,
+    pointer: null, pointerDown: false, trail: [], pulses: [], flower: -1, orbitClock: 0, lastFrame: 0,
+    wandShape: "heart", burst: null, dustStarted: false, dustCollected: new Set(), mixIngredients: [],
+    crystalSequence: ["⭐", "🌙", "🌸"], crystalStep: 0, crystalDone: false, crystalMessage: "Follow the glowing symbols in order.",
+    patternSequence: [0, 2, 1, 3, 4], patternLength: 2, patternStep: 0, patternPlaying: false,
+    patternInput: false, patternFlash: -1, patternStatus: "Tap Start, watch the stars, then repeat them.",
+    floatOrb: { x: 0.12, y: 0.72 }, floatDragging: false, floatStars: new Set(), floatWon: false,
+    ingredients: new Set(), spellResult: "",
+  };
   const controls = modalRoot.querySelector("#simulation-controls");
   let animationFrame;
+  let patternTimers = [];
   let stars = Array.from({ length: 22 }, () => ({ x: Math.random(), y: Math.random(), phase: Math.random() * 8 }));
 
   function renderControls() {
@@ -1737,8 +2142,23 @@ function renderSimulations() {
       controls.innerHTML = `<label class="control-label">Orbital speed <input class="range-control" id="speed" type="range" min="0" max="2.5" step="0.1" value="${state.speed}"></label><button class="pill-button" id="pause-orbit" type="button">${state.paused ? "Resume" : "Pause"} orbit</button>`;
     } else if (state.mode === "gravity") {
       controls.innerHTML = `<label class="control-label">Gravity strength <input class="range-control" id="gravity" type="range" min="0" max="2" step="0.1" value="${state.gravity}"></label>`;
+    } else if (state.mode === "wand") {
+      controls.innerHTML = `<span class="small-note">Draw a spell with your finger or mouse.</span>${["heart", "star", "circle", "butterfly"].map((shape) => `<button class="pill-button ${state.wandShape === shape ? "is-active" : ""}" type="button" data-wand-shape="${shape}">${shape[0].toUpperCase()}${shape.slice(1)}</button>`).join("")}<button class="secondary-button" type="button" data-lab-reset="wand">Clear trail</button>`;
+    } else if (state.mode === "dust") {
+      controls.innerHTML = `<button class="button button-gold" type="button" data-dust-start>${state.dustStarted ? "Restart fairy dust hunt" : "Start fairy dust hunt"}</button><span class="badge-counter">${state.dustCollected.size}/20 fairy dust</span><span class="small-note">${state.dustCollected.size === 20 ? "Rainbow celebration complete! 🌈" : "Tap each glowing dust mote on the canvas."}</span>`;
+    } else if (state.mode === "mixer") {
+      controls.innerHTML = `<span class="small-note">Choose two different magical colours.</span>${[["pink", "Rose Pink"], ["blue", "Celestial Blue"], ["gold", "Golden Sunlight"]].map(([id, label]) => `<button class="pill-button ${state.mixIngredients.includes(id) ? "is-active" : ""}" type="button" data-mix-color="${id}">${label}</button>`).join("")}<button class="secondary-button" type="button" data-lab-reset="mixer">Mix again</button><span class="compliment">${state.spellResult || `${state.mixIngredients.length}/2 colours selected`}</span>`;
+    } else if (state.mode === "crystal") {
+      controls.innerHTML = `<span class="small-note">${state.crystalDone ? "Crystal restored! Your gentle magic brought it back to life. 💎" : `${state.crystalMessage} ${state.crystalSequence.map((symbol, index) => index < state.crystalStep ? "✓" : "✧").join(" ")}`}</span>${["⭐", "🌙", "🌸"].map((symbol) => `<button class="pill-button" type="button" data-crystal-symbol="${symbol}" aria-label="Choose ${symbol}">${symbol}</button>`).join("")}<button class="secondary-button" type="button" data-lab-reset="crystal">Play again</button>`;
+    } else if (state.mode === "pattern") {
+      controls.innerHTML = `<span class="small-note" aria-live="polite">${state.patternStatus}</span><button class="button button-gold" type="button" data-pattern-start>${state.patternInput ? "Repeat the stars below" : "Start star pattern"}</button><button class="secondary-button" type="button" data-lab-reset="pattern">Restart</button>`;
+    } else if (state.mode === "laboratory") {
+      const items = [["petals", "🌸 Marigold Petals"], ["starlight", "⭐ Starlight"], ["fairy", "🦋 Fairy Dust"], ["moon", "🌙 Moon Crystals"], ["rainbow", "🌈 Rainbow Drops"]];
+      controls.innerHTML = `<span class="small-note">Choose exactly three ingredients, then cast.</span>${items.map(([id, label]) => `<button class="pill-button ${state.ingredients.has(id) ? "is-active" : ""}" type="button" data-ingredient="${id}">${label}</button>`).join("")}<button class="button button-gold" type="button" data-cast-spell ${state.ingredients.size !== 3 ? "disabled" : ""}>Cast spell</button><button class="secondary-button" type="button" data-lab-reset="laboratory">Clear</button><span class="compliment">${state.spellResult || `${state.ingredients.size}/3 ingredients`}</span>`;
+    } else if (state.mode === "floating") {
+      controls.innerHTML = `<span class="small-note">${state.floatWon ? "You guided the magic home! 🌟" : "Drag the glowing orb through the path and gather three stars."}</span><button class="secondary-button" type="button" data-lab-reset="floating">Restart floating magic</button>`;
     } else {
-      controls.innerHTML = `<span class="small-note">${state.mode === "wand" ? "Click and drag to draw a trail of sparkles." : "Click any flower on canvas to bloom."}</span>`;
+      controls.innerHTML = `<span class="small-note">${state.mode === "flowers" ? "Tap any flower on canvas to bloom." : "Drag the glowing orb through the path and gather three stars."}</span><button class="secondary-button" type="button" data-lab-reset="floating">Restart floating magic</button>${state.mode === "floating" && state.floatWon ? `<span class="compliment">You guided the magic home! 🌟</span>` : ""}`;
     }
   }
 
@@ -1816,6 +2236,26 @@ function renderSimulations() {
       });
       context.globalAlpha = 1;
       context.fillStyle = "#ffe6aa"; context.font = "18px serif"; context.fillText("✦", width / 2 - 6, height / 2 + 5);
+      if (state.burst && now - state.burst.time < 950) {
+        const progress = (now - state.burst.time) / 950;
+        const scale = 20 + progress * 28;
+        context.save();
+        context.translate(state.burst.x, state.burst.y);
+        context.globalAlpha = 1 - progress;
+        context.strokeStyle = "#f6c4df";
+        context.fillStyle = "#ffe8ac";
+        context.lineWidth = 3;
+        if (state.burst.shape === "circle") {
+          context.beginPath(); context.arc(0, 0, scale, 0, Math.PI * 2); context.stroke();
+        } else if (state.burst.shape === "star") {
+          context.font = `${scale * 2}px serif`; context.fillText("★", -scale, scale * .6);
+        } else if (state.burst.shape === "butterfly") {
+          context.font = `${scale * 2}px serif`; context.fillText("🦋", -scale, scale * .6);
+        } else {
+          context.font = `${scale * 2}px serif`; context.fillText("♥", -scale * .5, scale * .6);
+        }
+        context.restore();
+      }
     } else if (state.mode === "flowers") {
       for (let i = 0; i < 5; i += 1) {
         const x = width * (0.1 + i * 0.2); const y = height * 0.55;
@@ -1840,7 +2280,7 @@ function renderSimulations() {
         const x = cx + Math.cos(angle) * radius * 1.55; const y = cy + Math.sin(angle) * radius * 0.55;
         context.fillStyle = "#ffe3a3"; context.beginPath(); context.arc(x, y, 4 + index, 0, Math.PI * 2); context.fill();
       });
-    } else {
+    } else if (state.mode === "gravity") {
       for (let i = 0; i < 9; i += 1) {
         const x = width * (0.11 + i * 0.1);
         const phase = t * (0.5 + state.gravity * 0.65) + i * 1.3;
@@ -1850,6 +2290,93 @@ function renderSimulations() {
         context.fillRect(-7, -7, 14, 14);
         context.restore();
       }
+    } else if (state.mode === "dust") {
+      for (let i = 0; i < 20; i += 1) {
+        const x = width * (0.1 + ((i * 37) % 81) / 100);
+        const y = height * (0.2 + ((i * 53) % 61) / 100);
+        if (state.dustCollected.has(i)) continue;
+        const pulse = 1 + Math.sin(t * 3 + i) * 1.3;
+        context.fillStyle = i % 7 === 0 ? "#ffe48d" : "#f7c7ec";
+        context.shadowColor = context.fillStyle; context.shadowBlur = 12;
+        context.beginPath(); context.arc(x, y, 5 + pulse, 0, Math.PI * 2); context.fill();
+        context.shadowBlur = 0;
+        context.fillStyle = "#fff8e8";
+        context.beginPath(); context.arc(x - 2, y - 2, 1.4, 0, Math.PI * 2); context.fill();
+      }
+      if (!state.dustStarted) {
+        context.fillStyle = "#fff8ed"; context.font = "16px sans-serif"; context.textAlign = "center";
+        context.fillText("Press Start, then tap each glowing mote", width / 2, height * .88);
+        context.textAlign = "start";
+      }
+    } else if (state.mode === "mixer") {
+      const colors = { pink: "#f08cbd", blue: "#78b5ec", gold: "#e8bf59" };
+      const selected = state.mixIngredients;
+      selected.forEach((color, index) => {
+        const x = width / 2 + (index - (selected.length - 1) / 2) * Math.min(95, width * .24);
+        context.fillStyle = colors[color]; context.shadowColor = colors[color]; context.shadowBlur = 26;
+        context.beginPath(); context.arc(x, height * .48, 28, 0, Math.PI * 2); context.fill();
+      });
+      context.shadowBlur = 0;
+      if (state.spellResult) {
+        const mixColor = state.spellResult.includes("Purple") ? "#b78ce5" : state.spellResult.includes("Celestial") ? "#8ac9dc" : "#e7a97f";
+        context.fillStyle = mixColor; context.shadowColor = mixColor; context.shadowBlur = 35;
+        context.beginPath(); context.arc(width / 2, height * .73, 20 + Math.sin(t * 3) * 3, 0, Math.PI * 2); context.fill();
+        context.shadowBlur = 0;
+      }
+    } else if (state.mode === "crystal") {
+      const cx = width / 2; const cy = height / 2;
+      context.fillStyle = state.crystalDone ? "#8be3df" : "#bd9be8";
+      context.shadowColor = context.fillStyle; context.shadowBlur = 18 + state.crystalStep * 6;
+      context.beginPath();
+      context.moveTo(cx, cy - 64); context.lineTo(cx + 36, cy - 10); context.lineTo(cx + 20, cy + 52);
+      context.lineTo(cx, cy + 66); context.lineTo(cx - 20, cy + 52); context.lineTo(cx - 36, cy - 10);
+      context.closePath(); context.fill();
+      context.shadowBlur = 0;
+      context.strokeStyle = "#fff4d3"; context.lineWidth = 3;
+      for (let i = 0; i < state.crystalStep; i += 1) {
+        context.beginPath(); context.moveTo(cx - 22 + i * 14, cy - 28); context.lineTo(cx + 8 - i * 4, cy + 30); context.stroke();
+      }
+      context.fillStyle = "#fff8ed"; context.font = "18px serif"; context.fillText(state.crystalDone ? "💎" : "✧", cx + 45, cy - 42);
+    } else if (state.mode === "pattern") {
+      const points = [0, 1, 2, 3, 4].map((i) => ({ x: width * (.2 + i * .15), y: height * (.48 + Math.sin(i * 1.1) * .22) }));
+      if (state.patternLength >= 5 && state.patternStep === 5) {
+        context.strokeStyle = "#f8c6e3"; context.lineWidth = 3; context.beginPath();
+        points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
+        context.closePath(); context.stroke();
+      }
+      points.forEach((point, index) => {
+        context.fillStyle = state.patternFlash === index ? "#fff4a7" : "#dfc1f4";
+        context.shadowColor = context.fillStyle; context.shadowBlur = state.patternFlash === index ? 22 : 7;
+        context.beginPath(); context.arc(point.x, point.y, state.patternFlash === index ? 12 : 7, 0, Math.PI * 2); context.fill();
+      });
+      context.shadowBlur = 0;
+    } else if (state.mode === "floating") {
+      const start = { x: width * .12, y: height * .72 };
+      const finish = { x: width * .9, y: height * .28 };
+      context.strokeStyle = "rgba(247,222,178,.65)"; context.lineWidth = 8; context.lineCap = "round";
+      context.beginPath(); context.moveTo(start.x, start.y); context.bezierCurveTo(width * .3, height * .15, width * .63, height * .85, finish.x, finish.y); context.stroke();
+      [[.34,.38],[.55,.58],[.74,.4]].forEach(([x,y], index) => {
+        if (state.floatStars.has(index)) return;
+        context.fillStyle = "#ffe998"; context.shadowColor = "#ffe998"; context.shadowBlur = 12;
+        context.beginPath(); context.arc(width*x, height*y, 8, 0, Math.PI*2); context.fill();
+      });
+      context.shadowBlur = 0;
+      context.fillStyle = "#e8af71"; context.beginPath(); context.arc(width*state.floatOrb.x, height*state.floatOrb.y, 15, 0, Math.PI*2); context.fill();
+      context.fillStyle = "#fff5d9"; context.beginPath(); context.arc(width*state.floatOrb.x, height*state.floatOrb.y, 7, 0, Math.PI*2); context.fill();
+      context.fillStyle = "#b7edcf"; context.beginPath(); context.arc(finish.x, finish.y, 16, 0, Math.PI*2); context.fill();
+      context.fillStyle = "#fff8ed"; context.font = "13px sans-serif"; context.fillText("START", start.x - 18, start.y + 30); context.fillText("GOAL", finish.x - 16, finish.y - 22);
+    } else if (state.mode === "laboratory") {
+      const effects = {
+        "Festival of Light": ["#f3c46d", "✨"],
+        "Celestial Rainbow": ["#9dc6ed", "🌈"],
+        "Enchanted Garden Bloom": ["#e99dc5", "🌸"],
+      };
+      const resultName = Object.keys(effects).find((name) => state.spellResult.startsWith(name));
+      const [color, glyph] = effects[resultName] || ["#d9c5ee", "🪄"];
+      context.fillStyle = color; context.shadowColor = color; context.shadowBlur = state.spellResult ? 30 : 12;
+      context.beginPath(); context.arc(width / 2, height * .5, 25 + (state.spellResult ? Math.sin(t * 3) * 3 : 0), 0, Math.PI * 2); context.fill();
+      context.shadowBlur = 0;
+      context.font = "30px serif"; context.fillText(glyph, width / 2 + 35, height * .5 + 10);
     }
     animationFrame = requestAnimationFrame(draw);
   }
@@ -1857,8 +2384,41 @@ function renderSimulations() {
   renderControls();
   animationFrame = requestAnimationFrame(draw);
 
+  const clearPatternTimers = () => {
+    patternTimers.forEach((timer) => window.clearTimeout(timer));
+    patternTimers = [];
+  };
+  const startPatternRound = () => {
+    clearPatternTimers();
+    state.patternPlaying = true;
+    state.patternInput = false;
+    state.patternStep = 0;
+    state.patternStatus = "Watch the glowing stars…";
+    renderControls();
+    const showStep = (step) => {
+      if (step >= state.patternLength) {
+        state.patternFlash = -1;
+        state.patternPlaying = false;
+        state.patternInput = true;
+        state.patternStatus = "Your turn! Tap the stars in the same order.";
+        renderControls();
+        return;
+      }
+      state.patternFlash = state.patternSequence[step];
+      patternTimers.push(window.setTimeout(() => {
+        state.patternFlash = -1;
+        patternTimers.push(window.setTimeout(() => showStep(step + 1), 170));
+      }, 420));
+    };
+    showStep(0);
+  };
   modalRoot.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
+    clearPatternTimers();
+    state.patternPlaying = false;
+    state.patternInput = false;
+    state.pointerDown = false;
     state.mode = button.dataset.mode;
+    canvas.style.touchAction = state.mode === "wand" || state.mode === "floating" ? "none" : "pan-y";
     modalRoot.querySelectorAll("[data-mode]").forEach((item) => item.classList.toggle("is-active", item === button));
     renderControls();
   }));
@@ -1873,18 +2433,97 @@ function renderSimulations() {
     if (event.target.id === "formation") state.formation = event.target.value;
   });
   controls.addEventListener("click", (event) => {
-    if (event.target.id === "pause-orbit") {
+    const target = event.target.closest("button");
+    if (!target) return;
+    if (target.id === "pause-orbit") {
       state.paused = !state.paused;
-      event.target.textContent = state.paused ? "Resume orbit" : "Pause orbit";
+      target.textContent = state.paused ? "Resume orbit" : "Pause orbit";
+      return;
+    }
+    if (target.dataset.wandShape) {
+      state.wandShape = target.dataset.wandShape;
+      renderControls();
+    } else if (target.dataset.labReset) {
+      const resetMode = target.dataset.labReset;
+      if (resetMode === "wand") { state.trail = []; state.burst = null; }
+      if (resetMode === "dust") { state.dustCollected.clear(); state.dustStarted = true; }
+      if (resetMode === "mixer") { state.mixIngredients = []; state.spellResult = ""; }
+      if (resetMode === "crystal") { state.crystalStep = 0; state.crystalDone = false; state.crystalMessage = "Follow the glowing symbols in order."; }
+      if (resetMode === "pattern") { clearPatternTimers(); state.patternLength = 2; state.patternStep = 0; state.patternInput = false; state.patternFlash = -1; state.patternStatus = "Tap Start, watch the stars, then repeat them."; }
+      if (resetMode === "floating") { state.floatOrb = { x: .12, y: .72 }; state.floatStars.clear(); state.floatWon = false; }
+      if (resetMode === "laboratory") { state.ingredients.clear(); state.spellResult = ""; }
+      renderControls();
+    } else if (target.hasAttribute("data-dust-start")) {
+      state.dustStarted = true;
+      state.dustCollected.clear();
+      renderControls();
+    } else if (target.dataset.mixColor) {
+      if (state.mixIngredients.includes(target.dataset.mixColor)) return;
+      if (state.mixIngredients.length === 2) state.mixIngredients.shift();
+      state.mixIngredients.push(target.dataset.mixColor);
+      const combination = [...state.mixIngredients].sort().join("-");
+      const results = {
+        "blue-pink": "Purple Fairy Magic — Pink and blue swirl into a dreamy violet glow.",
+        "blue-gold": "Celestial Glow — Blue and sunlight shimmer like a gentle dawn.",
+        "gold-pink": "Rose-Gold Sparkle — Warm gold and rose make a sparkling sunset.",
+      };
+      state.spellResult = state.mixIngredients.length === 2 ? results[combination] || "A surprising new glow!" : "";
+      renderControls();
+    } else if (target.dataset.crystalSymbol) {
+      if (state.crystalDone) return;
+      if (target.dataset.crystalSymbol === state.crystalSequence[state.crystalStep]) {
+        state.crystalStep += 1;
+        state.crystalDone = state.crystalStep === state.crystalSequence.length;
+        state.crystalMessage = state.crystalDone ? "Your patient magic restored the crystal!" : "Lovely! Keep going:";
+        soundManager.play(state.crystalDone ? "celebrate" : "sparkle");
+        if (state.crystalDone) world?.triggerCelebration();
+      } else {
+        state.crystalStep = 0;
+        state.crystalMessage = "Not quite—try the first symbol again:";
+        soundManager.play("click");
+      }
+      renderControls();
+    } else if (target.hasAttribute("data-pattern-start")) {
+      if (!state.patternPlaying) startPatternRound();
+    } else if (target.dataset.ingredient) {
+      if (state.ingredients.has(target.dataset.ingredient)) state.ingredients.delete(target.dataset.ingredient);
+      else if (state.ingredients.size < 3) state.ingredients.add(target.dataset.ingredient);
+      state.spellResult = "";
+      renderControls();
+    } else if (target.hasAttribute("data-cast-spell")) {
+      const recipe = [...state.ingredients].sort().join("-");
+      const recipes = {
+        "fairy-petals-starlight": ["Festival of Light", "A glowing Dashain lantern of gentle golden magic appears. ✨"],
+        "moon-rainbow-starlight": ["Celestial Rainbow", "Moon crystals and rainbow drops paint a shining path across the sky. 🌈"],
+        "fairy-moon-petals": ["Enchanted Garden Bloom", "Fairy dust wakes a garden of warm marigold light. 🌸"],
+      };
+      const result = recipes[recipe];
+      state.spellResult = result ? `${result[0]} — ${result[1]}` : "A tiny fizz! Try a different trio of ingredients.";
+      soundManager.play(result ? "secret" : "click");
+      if (result) world?.triggerCelebration();
+      renderControls();
     }
   });
 
   canvas.addEventListener("pointermove", (event) => {
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
     if (state.mode === "orb") state.pointer = { x, y };
-    if (state.mode === "wand" && event.buttons !== 0) state.trail.push({ x, y, time: performance.now() });
+    if (state.mode === "wand" && state.pointerDown) state.trail.push({ x, y, time: performance.now() });
+    if (state.mode === "floating" && state.floatDragging && !state.floatWon) {
+      state.floatOrb = { x: x / rect.width, y: y / rect.height };
+      [[.34,.38],[.55,.58],[.74,.4]].forEach(([sx, sy], index) => {
+        if (Math.hypot(state.floatOrb.x - sx, state.floatOrb.y - sy) < .07) state.floatStars.add(index);
+      });
+      if (state.floatOrb.x > .86 && state.floatOrb.y < .4 && state.floatStars.size === 3) {
+        state.floatWon = true;
+        state.floatDragging = false;
+        world?.triggerCelebration();
+        soundManager.play("celebrate");
+        renderControls();
+      }
+    }
   });
   canvas.addEventListener("pointerleave", () => { state.pointer = null; });
   canvas.addEventListener("pointerdown", (event) => {
@@ -1894,16 +2533,100 @@ function renderSimulations() {
       state.pulses.push({ x, y, time: performance.now() });
       soundManager.play("sparkle");
     } else if (state.mode === "wand") {
+      event.preventDefault();
+      state.pointerDown = true;
+      canvas.setPointerCapture(event.pointerId);
       state.trail.push({ x, y, time: performance.now() });
       soundManager.play("sparkle");
     } else if (state.mode === "flowers") {
       const index = Math.max(0, Math.min(4, Math.round((x / rect.width) * 5 - 0.5)));
       state.flower = index;
       soundManager.play("bloom");
+    } else if (state.mode === "dust" && state.dustStarted && state.dustCollected.size < 20) {
+      const hitIndex = Array.from({ length: 20 }, (_, index) => index).find((index) => {
+        if (state.dustCollected.has(index)) return false;
+        const dustX = rect.width * (0.1 + ((index * 37) % 81) / 100);
+        const dustY = rect.height * (0.2 + ((index * 53) % 61) / 100);
+        return Math.hypot(x - dustX, y - dustY) < 25;
+      });
+      if (hitIndex !== undefined) {
+        state.dustCollected.add(hitIndex);
+        soundManager.play("sparkle");
+        if (state.dustCollected.size === 20) {
+          state.dustStarted = false;
+          world?.triggerCelebration();
+          soundManager.play("celebrate");
+          kariSpeak("Twenty fairy-dust sparkles! Look at that rainbow magic! 🌈", 4500);
+        }
+        renderControls();
+      }
+    } else if (state.mode === "pattern" && state.patternInput && !state.patternPlaying) {
+      const points = [0, 1, 2, 3, 4].map((i) => ({ x: rect.width * (.2 + i * .15), y: rect.height * (.48 + Math.sin(i * 1.1) * .22) }));
+      const selected = points.reduce((best, point, index) => Math.hypot(x - point.x, y - point.y) < Math.hypot(x - points[best].x, y - points[best].y) ? index : best, 0);
+      if (Math.hypot(x - points[selected].x, y - points[selected].y) > 28) return;
+      if (selected === state.patternSequence[state.patternStep]) {
+        state.patternStep += 1;
+        state.patternFlash = selected;
+        if (state.patternStep === state.patternLength) {
+          state.patternInput = false;
+          state.patternLength = Math.min(state.patternLength + 1, 5);
+          state.patternStatus = state.patternLength === 5 && state.patternStep === 5
+            ? "Beautiful! You made a sister-heart constellation! 💗"
+            : "You remembered them! Start the next, slightly longer pattern.";
+          if (state.patternLength === 5 && state.patternStep === 5) {
+            world?.triggerCelebration();
+            soundManager.play("celebrate");
+          }
+          else soundManager.play("wish");
+        }
+      } else {
+        state.patternInput = false;
+        state.patternStep = 0;
+        state.patternStatus = "Almost! Press Start to watch the pattern and try again.";
+        soundManager.play("click");
+      }
+      renderControls();
+    } else if (state.mode === "floating" && !state.floatWon) {
+      const orbX = rect.width * state.floatOrb.x;
+      const orbY = rect.height * state.floatOrb.y;
+      if (Math.hypot(x - orbX, y - orbY) < 35) {
+        state.floatDragging = true;
+        canvas.setPointerCapture(event.pointerId);
+      }
     }
   });
+  canvas.addEventListener("pointerup", (event) => {
+    if (state.mode === "wand" && state.pointerDown) {
+      state.pointerDown = false;
+      const rect = canvas.getBoundingClientRect();
+      state.burst = { x: event.clientX - rect.left, y: event.clientY - rect.top, time: performance.now(), shape: state.wandShape };
+    }
+    state.floatDragging = false;
+  });
+  canvas.addEventListener("pointercancel", () => {
+    state.pointerDown = false;
+    state.floatDragging = false;
+  });
 
-  modalCleanup = () => cancelAnimationFrame(animationFrame);
+  if (!gardenSurpriseShown && Math.random() < 0.3) {
+    surpriseTimer = window.setTimeout(() => {
+      const note = modalRoot.querySelector("#garden-surprise-note");
+      if (!note || !modalRoot.firstElementChild) return;
+      gardenSurpriseShown = true;
+      sessionStorage.setItem("yunisha_garden_surprise", "true");
+      note.textContent = [
+        "A rainbow butterfly just fluttered past the flowers! 🦋",
+        "A trail of golden fairy dust sparkles along the garden path! ✨",
+        "Didi's little blessing: May your day bloom with joy and sunshine. 🌼",
+      ][Math.floor(Math.random() * 3)];
+    }, 7000);
+  }
+
+  modalCleanup = () => {
+    cancelAnimationFrame(animationFrame);
+    clearPatternTimers();
+    window.clearTimeout(surpriseTimer);
+  };
 }
 
 // =========================================================================
@@ -1934,7 +2657,7 @@ function renderGifts() {
 
     <div id="gift-reveal" aria-live="polite"></div>
     <div class="row row-between" style="margin-top:20px;">
-      <span class="small-note">Opened ${openedGifts.size} of ${gifts.length} magical keepsakes.</span>
+      <span class="small-note" id="gift-open-count" aria-live="polite">Opened ${openedGifts.size} of ${gifts.length} magical keepsakes.</span>
       <button class="pill-button" data-open="letter">Read Didi's Full Letter 💌</button>
     </div>
   `, "Hall of Magical Gifts");
@@ -1945,12 +2668,14 @@ function renderGifts() {
     tile.addEventListener("click", () => {
       const index = Number(tile.dataset.gift);
       const gift = gifts[index];
-      if (!openedGifts.has(index)) {
+      const isNewGift = !openedGifts.has(index);
+      if (isNewGift) {
         addXP(30, "Opened Royal Gift");
         unlockAchievement("first_gift");
       }
       openedGifts.add(index);
       saveSet("yunisha_opened_gifts", openedGifts);
+      modalRoot.querySelector("#gift-open-count").textContent = `Opened ${openedGifts.size} of ${gifts.length} magical keepsakes.`;
       if (openedGifts.size >= 10) unlockAchievement("all_gifts");
 
       tile.classList.add("is-opened");
@@ -1976,10 +2701,67 @@ function renderGifts() {
           <p class="gift-body-message">${gift.message}</p>
           <div class="row" style="margin-top:14px;">${actionHtml}</div>
         </div>
+        <div class="row gift-next-action"><button class="pill-button" type="button" id="open-another-gift">Open Another Gift 🎁</button></div>
       `;
+
+      if (gift.title === "Memories") {
+        const sisterPhotos = galleryPhotos.filter((photo) => ["sis n me dashain 1.jpeg", "sis n me dashain 2.jpeg"].includes(photo.file));
+        const book = document.createElement("section");
+        book.className = "gift-memory-book";
+        book.setAttribute("aria-label", "A little book of sister memories");
+        book.innerHTML = `
+          <h4>Our Little Memory Book 💗</h4>
+          <div class="gift-memory-frame">
+            <img src="${sisterPhotos[0].src}" alt="${sisterPhotos[0].alt}" />
+          </div>
+          <p class="gift-memory-caption" aria-live="polite">${sisterPhotos[0].caption}</p>
+          <div class="row centered-action">
+            <button class="secondary-button" type="button" data-memory-step="-1" aria-label="Previous sister memory">← Previous</button>
+            <span class="small-note gift-memory-count">1 / ${sisterPhotos.length}</span>
+            <button class="secondary-button" type="button" data-memory-step="1" aria-label="Next sister memory">Next →</button>
+          </div>
+        `;
+        panel.appendChild(book);
+        let photoIndex = 0;
+        let touchStartX = null;
+        const memoryImage = book.querySelector("img");
+        const memoryCaption = book.querySelector(".gift-memory-caption");
+        const memoryCount = book.querySelector(".gift-memory-count");
+        const showPhoto = (nextIndex) => {
+          photoIndex = (nextIndex + sisterPhotos.length) % sisterPhotos.length;
+          const photo = sisterPhotos[photoIndex];
+          memoryImage.src = photo.src;
+          memoryImage.alt = photo.alt;
+          memoryCaption.textContent = photo.caption;
+          memoryCount.textContent = `${photoIndex + 1} / ${sisterPhotos.length}`;
+        };
+        watchLocalImage(memoryImage, sisterPhotos[0].file);
+        book.querySelectorAll("[data-memory-step]").forEach((button) => button.addEventListener("click", () => {
+          showPhoto(photoIndex + Number(button.dataset.memoryStep));
+          soundManager.play("click");
+        }));
+        book.addEventListener("touchstart", (event) => { touchStartX = event.changedTouches[0].clientX; }, { passive: true });
+        book.addEventListener("touchend", (event) => {
+          if (touchStartX === null) return;
+          const delta = event.changedTouches[0].clientX - touchStartX;
+          touchStartX = null;
+          if (Math.abs(delta) > 45) showPhoto(photoIndex + (delta < 0 ? 1 : -1));
+        }, { passive: true });
+      }
+
+      if (openedGifts.size === gifts.length && isNewGift) {
+        panel.querySelector(".gift-reveal").classList.add("gift-collection-complete");
+        kariSpeak("You opened all ten keepsakes! Every one is wrapped with Didi's love. 💖", 5000);
+        world?.triggerCelebration();
+      }
 
       panel.querySelectorAll("[data-open]").forEach((btn) => {
         btn.addEventListener("click", () => openModal(btn.dataset.open));
+      });
+      panel.querySelector("#open-another-gift")?.addEventListener("click", () => {
+        const nextIndex = gifts.findIndex((_, giftIndex) => !openedGifts.has(giftIndex));
+        const nextTile = modalRoot.querySelector(`[data-gift="${nextIndex >= 0 ? nextIndex : (index + 1) % gifts.length}"]`);
+        nextTile?.click();
       });
 
       announce(`Opened: ${gift.title}! ✨`);
@@ -2677,7 +3459,7 @@ function renderObservatory() {
         </svg>
 
         ${constellationStars.map((s) => `
-          <button type="button" class="observatory-star-node ${starConstellationConnected.has(s.id) ? "is-connected" : ""}" data-star-id="${s.id}" style="left:${s.x}%; top:${s.y}%;" aria-label="${s.label}">
+          <button type="button" class="observatory-star-node ${starConstellationConnected.has(s.id) ? "is-connected" : ""}" data-star-id="${s.id}" style="left:${s.x}%; top:${s.y}%;" aria-label="${s.label}" aria-pressed="${starConstellationConnected.has(s.id)}">
             <span class="star-sparkle-glyph">★</span>
             <span class="star-node-label">${s.label}</span>
           </button>
@@ -2691,18 +3473,39 @@ function renderObservatory() {
 
       <p id="observatory-message" class="compliment" aria-live="polite">
         ${starConstellationConnected.size === constellationStars.length
-          ? "💖 CONSTELLATION COMPLETED: Wherever you wander under the stars, my sisterly love will always light your path, Yunisha!"
-          : "Tap the glowing stars to draw lines and complete the Sister Constellation."}
+          ? "💖 CONSTELLATION COMPLETED: Across every star and every sky, a sister's love will always shine. Wherever you wander under the stars, my sisterly love will always light your path, Yunisha!"
+          : "Begin with the Star of Kindness, then follow the heart-shaped path."}
       </p>
+      <button class="pill-button moon-hint-button" type="button" id="moon-hint">Ask the moon for a puzzle hint ☾</button>
     </div>
 
     <div class="soft-panel row-between" style="margin-top:20px;">
       <div>
-        <strong>The Moon Watches Over You</strong>
+        <strong><span class="observatory-moon" id="observatory-moon" aria-hidden="true">🌙</span> The Moon Watches Over You</strong>
         <p class="small-note" style="margin:2px 0 0;">Each twinkle in the night sky is a little wish whispered for your happiness.</p>
       </div>
       <button class="pill-button" data-open="simulations">Try Orbit Simulation 🪐</button>
     </div>
+    <section class="shooting-star-wishes soft-panel" aria-labelledby="shooting-star-title">
+      <h3 class="section-title" id="shooting-star-title">A Shooting-Star Wish 🌠</h3>
+      <p class="small-note">Choose a wish to keep in your heart.</p>
+      <div class="wish-choice-row" role="group" aria-label="Choose a shooting-star wish">
+        <button class="pill-button" type="button" data-star-wish="Happiness">Happiness ☀️</button>
+        <button class="pill-button" type="button" data-star-wish="Courage">Courage 🦁</button>
+        <button class="pill-button" type="button" data-star-wish="Imagination">Imagination 🌈</button>
+        <button class="pill-button" type="button" data-star-wish="Love & Family">Love &amp; Family 💗</button>
+      </div>
+      <p id="star-wish-message" class="compliment" aria-live="polite">Your wish stays right here with you.</p>
+    </section>
+    <details class="celestial-discoveries soft-panel">
+      <summary><strong>Optional Celestial Discoveries ✨</strong><small>Three little secrets are waiting among the stars.</small></summary>
+      <div class="celestial-discovery-buttons">
+        <button class="pill-button" type="button" data-celestial-discovery="dream_planet" aria-pressed="${celestialDiscoveries.has("dream_planet")}">Dream Planet 🪐</button>
+        <button class="pill-button" type="button" data-celestial-discovery="moon_garden" aria-pressed="${celestialDiscoveries.has("moon_garden")}">Moon Garden 🌙</button>
+        <button class="pill-button" type="button" data-celestial-discovery="sister_star" aria-pressed="${celestialDiscoveries.has("sister_star")}">Sister Star 💗</button>
+      </div>
+      <p class="compliment" id="celestial-discovery-message" aria-live="polite">Tap a celestial secret to discover its message.</p>
+    </details>
   `, "Celestial Observatory");
 
   const svgLines = modalRoot.querySelector("#constellation-lines");
@@ -2716,24 +3519,78 @@ function renderObservatory() {
     }).join(" ");
     svgLines.setAttribute("points", points);
     counter.textContent = `Connected: ${starConstellationConnected.size}/${constellationStars.length}`;
+    const moon = modalRoot.querySelector("#observatory-moon");
+    if (moon) moon.style.filter = `brightness(${0.8 + starConstellationConnected.size * 0.08})`;
   };
   updateLines();
+
+  modalRoot.querySelector("#moon-hint")?.addEventListener("click", () => {
+    const nextStar = constellationStars[starConstellationConnected.size];
+    msg.textContent = nextStar
+      ? `The moon whispers: your next star is ${nextStar.label}. Tap it to continue the heart.`
+      : "The Sister Heart is complete! Tap Reset Constellation if you would like to trace it again.";
+    modalRoot.querySelector("#observatory-moon")?.classList.add("moon-twinkle");
+    soundManager.play("sparkle");
+  });
+
+  const celestialMessages = {
+    dream_planet: "On the Dream Planet, every kind wish grows into a bright new possibility. 🪐",
+    moon_garden: "The Moon Garden blooms with silver flowers that shine brightest at bedtime. 🌙",
+    sister_star: "The Sister Star reminds us that love can find its way across every sky. 💗",
+  };
+  modalRoot.querySelectorAll("[data-celestial-discovery]").forEach((button) => button.addEventListener("click", () => {
+    const id = button.dataset.celestialDiscovery;
+    if (!celestialMessages[id]) return;
+    const isNew = !celestialDiscoveries.has(id);
+    celestialDiscoveries.add(id);
+    if (isNew) saveSet("yunisha_celestial_discoveries", celestialDiscoveries);
+    button.setAttribute("aria-pressed", "true");
+    button.classList.toggle("is-discovered", celestialDiscoveries.has(id));
+    modalRoot.querySelector("#celestial-discovery-message").textContent = celestialMessages[id];
+    if (isNew) {
+      soundManager.play("wish");
+      world?.castFairySpell?.("stardust");
+    }
+  }));
 
   modalRoot.querySelectorAll("[data-star-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = Number(btn.dataset.starId);
+      if (starConstellationConnected.size >= constellationStars.length) {
+        msg.textContent = "The Sister Heart is shining! Tap Reset Constellation to trace it again.";
+        return;
+      }
+      const expectedId = starConstellationConnected.size;
+      if (id !== expectedId) {
+        btn.classList.remove("star-selection-wrong");
+        void btn.offsetWidth;
+        btn.classList.add("star-selection-wrong");
+        msg.textContent = `The heart path begins at ${constellationStars[expectedId].label}. Follow the stars in order.`;
+        soundManager.play("click");
+        return;
+      }
       starConstellationConnected.add(id);
       btn.classList.add("is-connected");
+      btn.setAttribute("aria-pressed", "true");
+      const moon = modalRoot.querySelector("#observatory-moon");
+      moon?.classList.add("moon-twinkle");
       soundManager.play("wish");
       updateLines();
 
       if (starConstellationConnected.size === constellationStars.length) {
         soundManager.play("secret");
         svgLines.setAttribute("stroke-dasharray", "none");
-        msg.textContent = "💖 CONSTELLATION COMPLETED: Wherever you wander under the stars, my sisterly love will always light your path, Yunisha!";
+        modalRoot.querySelector(".observatory-stage")?.classList.add("constellation-complete");
+        moon?.classList.add("moon-celebrate");
+        msg.textContent = "💖 CONSTELLATION COMPLETED: Across every star and every sky, a sister's love will always shine. Wherever you wander under the stars, my sisterly love will always light your path, Yunisha!";
         announce("Sister Heart Constellation completed! A stellar blessing unlocked! ✨");
+        const firstCompletion = !unlockedAchievements.has("star_gazer");
         unlockAchievement("star_gazer");
-        addXP(60, "Constellation Completed");
+        unlockAchievement("starlight_princess");
+        if (firstCompletion) addXP(60, "Constellation Completed");
+        world?.triggerCelebration();
+      } else {
+        msg.textContent = `${constellationStars[id].label} is glowing! Now connect ${constellationStars[starConstellationConnected.size].label}.`;
       }
     });
   });
@@ -2741,10 +3598,29 @@ function renderObservatory() {
   modalRoot.querySelector("#reset-stars-btn")?.addEventListener("click", () => {
     starConstellationConnected.clear();
     modalRoot.querySelectorAll(".observatory-star-node").forEach((b) => b.classList.remove("is-connected"));
+    modalRoot.querySelectorAll(".observatory-star-node").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    modalRoot.querySelector(".observatory-stage")?.classList.remove("constellation-complete");
+    modalRoot.querySelector("#observatory-moon")?.classList.remove("moon-celebrate");
+    modalRoot.querySelector("#observatory-moon")?.style.removeProperty("filter");
     svgLines.setAttribute("stroke-dasharray", "3 3");
     updateLines();
-    msg.textContent = "Tap the glowing stars to draw lines and complete the Sister Constellation.";
+    msg.textContent = "Begin with the Star of Kindness, then follow the heart-shaped path.";
   });
+
+  const wishBlessings = {
+    Happiness: "May laughter and sunny little moments find you every day.",
+    Courage: "May you remember how brave you are whenever a new adventure begins.",
+    Imagination: "May your bright imagination keep opening doors to wonderful worlds.",
+    "Love & Family": "May our family always surround you with care, hugs, and love.",
+  };
+  modalRoot.querySelectorAll("[data-star-wish]").forEach((button) => button.addEventListener("click", () => {
+    const choice = button.dataset.starWish;
+    modalRoot.querySelector("#star-wish-message").textContent = `🌠 ${wishBlessings[choice]}`;
+    modalRoot.querySelector(".shooting-star-wishes")?.classList.remove("shooting-star-active");
+    void modalRoot.querySelector(".shooting-star-wishes").offsetWidth;
+    modalRoot.querySelector(".shooting-star-wishes")?.classList.add("shooting-star-active");
+    soundManager.play("wish");
+  }));
 
   modalRoot.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => openModal(b.dataset.open)));
 }
@@ -2784,11 +3660,11 @@ function renderSecretRoom() {
             <span class="reunion-duo-icon" aria-hidden="true">👭</span>
             <div class="reunion-glow-ring"></div>
           </div>
-          <h2 class="np">मेरी प्यारी बहिनी युनिशा ❤️</h2>
+          <h2 class="np">मेरी प्यारी बहिनी युनिशा 💗</h2>
           <p class="reunion-dialogue-nepali" lang="ne">
-            "नानी युनिशा, संसारमा तिमीभन्दा प्यारो कोही छैन।<br/>
+            नानी युनिशा, संसारमा तिमिभन्दा प्यारो कोही छैन।<br/>
             तिमी मुस्कुराउँदा मेरो सारा संसार खुसी हुन्छ।<br/>
-            जीवनका हरेक पाइलामा दिदी सधैँ तिम्रो साथमा हुनेछु।"
+            जीवनका हरेक पाइलामा दिदी सधैँ तिम्रो साथमा हुनेछु।
           </p>
           <p class="reunion-dialogue-english">
             "Dearest Yunisha, you are the brightest joy of my life. Never forget how proud I am of you, and that my love and hugs will always be right beside you."
@@ -2810,10 +3686,10 @@ function renderSecretRoom() {
           <span class="divine-lotus-symbol">🪷</span>
         </div>
         <p class="modal-eyebrow">Divine Dashain Protection &amp; Grace</p>
-        <h2 class="np">विजया दशमीको पावन आशीर्वाद</h2>
+        <h2 class="np">विजया दशमीको पावन आशिर्वाद</h2>
         <div class="soft-panel sacred-mantra-box">
           <p class="sacred-mantra-nepali" lang="ne">
-            ॐ सर्वमंगल मांगल्ये शिवे सर्वार्थ साधिके।<br/>
+            ॐ सर्वमङ्गल माङ्गल्ये शिवे सर्वार्थ साधिके।<br/>
             शरण्ये त्र्यम्बके गौरि नारायणि नमोऽस्तु ते॥
           </p>
           <p class="sacred-mantra-trans">
@@ -2888,73 +3764,194 @@ function renderLetter() {
           <span>For Yunisha Karki</span>
         </div>
         <article class="book-page hidden" id="letter-paper" aria-label="Letter from your Didi">
-          <div id="typed-letter" class="typed-letter" aria-hidden="true"></div>
+          <div id="typed-letter" class="typed-letter" aria-live="polite"></div>
         </article>
       </div>
+      <p id="letter-page-indicator" class="small-note hidden" aria-live="polite"></p>
       <div class="row letter-controls">
         <button id="open-book" class="button button-gold" type="button" aria-expanded="false">Open your book 📖</button>
-        <button id="read-complete" class="secondary-button hidden" type="button">Read complete letter</button>
+        <button id="read-complete" class="secondary-button hidden" type="button">Skip opening animation</button>
+        <button id="letter-previous-page" class="secondary-button hidden" type="button">← Previous Page</button>
+        <button id="letter-next-page" class="button button-gold hidden" type="button">Next Page →</button>
         <button id="close-book" class="secondary-button hidden" type="button">Close the book</button>
       </div>
+      <div id="letter-extra-actions" class="row centered-action hidden">
+        <button id="open-memory-book" class="secondary-button" type="button">Open Our Little Memory Book 💗</button>
+        <button id="open-letter-envelope" class="pill-button" type="button">Open the Golden Envelope 💌</button>
+      </div>
+      <section class="letter-memory-book hidden" id="letter-memory-book" aria-label="Our Little Memory Book">
+        <h3>Our Little Memory Book 💗</h3>
+        <figure class="letter-memory-frame">
+          <img id="letter-memory-photo" alt="" />
+          <figcaption id="letter-memory-caption"></figcaption>
+        </figure>
+        <div class="row centered-action">
+          <button class="secondary-button" id="letter-memory-prev" type="button">← Previous</button>
+          <span class="small-note" id="letter-memory-count"></span>
+          <button class="secondary-button" id="letter-memory-next" type="button">Next →</button>
+        </div>
+        <button class="pill-button" type="button" data-return-letter>Back to the letter</button>
+      </section>
+      <section class="letter-envelope-view hidden" id="letter-envelope-view" aria-live="polite">
+        <div class="letter-envelope-heart" aria-hidden="true">💗</div>
+        <p>No matter how big your world becomes, you'll always have a special place in mine. 💗</p>
+        <button class="pill-button" type="button" data-return-letter>Back to the letter</button>
+      </section>
     </div>
   `, "A Letter for Yunisha");
 
-  const letter = `To my dearest Yunisha,\n\nI wanted to make something truly special for you this Dashain.\n\nNot just an ordinary gift, but an entire magical kingdom you could explore whenever you wish.\n\nEvery sparkling star, every blooming flower, and every tower of this castle was crafted with love just for you.\n\nKeep smiling your wonderful smile, keep being kind and curious, and always remember how deeply precious you are.\n\nAs you grow older, know that you will always have someone cheering for you, believing in your dreams, and loving you through every adventure.\n\nHappy Dashain, my little princess.\n\nWith all my love,\nYour Didi ❤️`;
+  const letter = `Meri pyari sano baini, Yunisha 🥹💗\n\nHey mero sano princess! 👑💗\n\nKaha bata suru garum nai tha chaina, tara timilai yo bhanna man cha ki timi mero lagi kati special chau bhanera sayad maile kahile ramrari bhanna sakeko chaina.\n\nTimi mero baini matra haina, timi mero mutu ko ekdamai pyaro part hau. Timi hasda malai pani khusi lagcha, timi udaas huda timilai k bhayo hola bhanera sochna thalchu. Kahile kahi timilai risauchu hola, jiskauchu hola, karauchu pani hola, tara tyo sab bhanda mathi timilai maya garne mero mutu kahile change hudaina hai. 🥹❤️\n\nSano, euta kura sadhai yaad rakhnu hai—timi jasto chau, mero lagi tyastai perfect chau. Timile sabai kura ma ramro garnai parcha bhanne chaina. Mistake garchau, kahile fail hunchau, kahile runa man lagcha, kahile kei pani ramro lagdaina hola. It's okay, baby. Timi pani manche hau, ani timilai pani naramro feel garna paune right cha.\n\nKahile kei kura le man dukhyo bhane, malai bhanna hai. Kasaile timilai hurt garyo bhane pani, aayera malai bhannu. Khusi chau bhane tyo pani share garnu, dukhi chau bhane tyo pani. Timile sabai kura aafai handle garnu pardaina. Ma timro kura sunna sadhai try garnechu. Maile sabai kura bujhna nasakum hola, tara timilai bujhna chai sadhai khojnechu. 🫂💗\n\nAni mero baby, ma timilai ekdamai proud feel garchu. Timi sano-sano kura sikdai chau, grow hudai chau, aafno dreams banaudai chau. Timro future ma timile k-k garnechau hola bhanera sochda nai khusi lagcha. Ma chahanchu timi aafno life ma dherai agadi badha, ramro manche bana, aafno dreams pura gara, ani sab bhanda important—aafailai maya garna kahile nabirsinu.\n\nAruko lagi change hunu pardaina. Arule k bhancha bhanera aafno happiness sacrifice garnu pardaina. Timro opinion important cha, timro feelings important chan, ani timi pani important chau.\n\nMa timilai sadhai protect garna sakchu bhanera promise garna sakdina, tara timilai strong banna, aafno lagi bolna, ani life ma aafno bato khojna chai sadhai encourage garnechu.\n\nHami kahile jhagada garlaum, ek-arkasanga risau laum, ek-arkako kura nasunlaum pani. Tara please, mero maya lai kahile doubt nagarnu hai. Jhagada bhayo bhandai ma timi mero lagi less important hune haina. You will always be my little sister, no matter how big you grow. 🥹💗\n\nThulo bhayepachi timi aafno life ma busy hola, naya manche haru bhetaula, naya thau haru ghumaula, aafno beautiful world banaula. Ma chahanchu timi tyo sab gara, dherai khusi hau, dherai agadi badha.\n\nTara life ma kahile garo time aayo bhane, timro lagi euta didi sadhai cha bhanne kura nabirsinu hai. Timilai advice chahiyo bhane, hug chahiyo bhane, ya kei naboli basna matra man lagyo bhane pani, you can come to me.\n\nTimi mero lagi kahile burden hune chainau. Timro problems, timro feelings, timro tears—maile timilai maya garna chhoddine reason kahile hune chainan.\n\nI may not be the perfect didi, tara ma timilai mero tarikale, mero pura mutu le maya garchu. ❤️\n\nThank you mero life ma aayeko ma. Thank you malai didi banna sikaidiyeko ma. Timisanga bitayeka sano-sano moments haru pani mero lagi special chan. Sayad timilai thaha hudaina hola, tara timile gareko sano kura le pani mero face ma smile lyaidincha.\n\nMero sano princess, sadhai hasirakhnu, ramailo garnu, dherai sapana dekhnu, ani aafno heart lai kind rakhnu. Tara kind huda-hudai aafno value chai kahile nabirsinu hai.\n\nMa timro biggest fan banna chahanchu. Timro success ma timibhanda dherai khusi hune manche, timro failure ma timilai feri try gara bhanne manche, ani timi aafailai doubt garda \"Mero baini le sakchha\" bhanera believe garne manche. 🥹❤️\n\nI love you so much, Yunisha. Words le explain garna nasakne gari.\n\nAni euta kura hai, timi jati thulo bhaye pani, mero lagi chai sadhai tei pyari sano baini nai hunechau. 💗\n\nLots of love, hugs, kisses, ani unlimited maya.\n\nForever timro didi,\nwho will always be there for you. 🫂💗\n\nP.S. Kahile ma timilai dherai maya garchu bhanera doubt lagyo bhane, yo letter feri padhnu hai. Maile timilai yo sab kura sachikai man bata bhanya ho. Love you, mero sano mutu. 😭💗👑`;
 
   const book = modalRoot.querySelector("#letter-book");
   const page = modalRoot.querySelector("#letter-paper");
   const typed = modalRoot.querySelector("#typed-letter");
   const openButton = modalRoot.querySelector("#open-book");
   const completeButton = modalRoot.querySelector("#read-complete");
+  const previousPageButton = modalRoot.querySelector("#letter-previous-page");
+  const nextPageButton = modalRoot.querySelector("#letter-next-page");
   const closeButton = modalRoot.querySelector("#close-book");
+  const pageIndicator = modalRoot.querySelector("#letter-page-indicator");
+  const extraActions = modalRoot.querySelector("#letter-extra-actions");
+  const memoryBook = modalRoot.querySelector("#letter-memory-book");
+  const envelopeView = modalRoot.querySelector("#letter-envelope-view");
+  const letterParagraphs = letter.split("\n\n");
+  const letterPages = [
+    letterParagraphs.slice(0, 3).join("\n\n"),
+    letterParagraphs.slice(3, 5).join("\n\n"),
+    letterParagraphs.slice(5, 7).join("\n\n"),
+    letterParagraphs.slice(7, 10).join("\n\n"),
+    letterParagraphs.slice(10, 13).join("\n\n"),
+    letterParagraphs.slice(13, 16).join("\n\n"),
+    letterParagraphs.slice(16, 19).join("\n\n"),
+    letterParagraphs.slice(19).join("\n\n")
+  ];
 
   let timer;
   let cursor = 0;
+  let pageIndex = 0;
+  let memoryIndex = 0;
+  const sisterPhotos = galleryPhotos.filter((photo) => ["sis n me dashain 1.jpeg", "sis n me dashain 2.jpeg"].includes(photo.file));
+  const letterPhoto = modalRoot.querySelector("#letter-memory-photo");
+  const letterCaption = modalRoot.querySelector("#letter-memory-caption");
+  const letterPhotoCount = modalRoot.querySelector("#letter-memory-count");
+
+  const showExtraActions = () => {
+    extraActions.classList.toggle("hidden", pageIndex !== letterPages.length - 1 || cursor < letterPages[pageIndex].length);
+  };
 
   const showCompleteLetter = () => {
     window.clearInterval(timer);
-    cursor = letter.length;
-    typed.textContent = letter;
+    cursor = letterPages[pageIndex].length;
+    typed.textContent = letterPages[pageIndex];
     completeButton.classList.add("hidden");
+    showExtraActions();
+  };
+
+  const renderPage = (animate = true) => {
+    window.clearInterval(timer);
+    cursor = 0;
+    const pageText = letterPages[pageIndex];
+    typed.textContent = "";
+    typed.scrollTop = 0;
+    pageIndicator.textContent = `Page ${pageIndex + 1} of ${letterPages.length}`;
+    pageIndicator.classList.remove("hidden");
+    previousPageButton.classList.toggle("hidden", pageIndex === 0);
+    nextPageButton.classList.toggle("hidden", pageIndex === letterPages.length - 1);
+    extraActions.classList.add("hidden");
+    completeButton.classList.toggle("hidden", !animate || reducedMotion);
+    if (!animate || reducedMotion) {
+      cursor = pageText.length;
+      typed.textContent = pageText;
+      showExtraActions();
+      return;
+    }
+    timer = window.setInterval(() => {
+      cursor = Math.min(cursor + 3, pageText.length);
+      typed.textContent = pageText.slice(0, cursor);
+      if (cursor >= pageText.length) {
+        window.clearInterval(timer);
+        completeButton.classList.add("hidden");
+        showExtraActions();
+      }
+    }, 18);
   };
 
   const openBook = () => {
     soundManager.play("doorway");
+    kariSpeak("Ooooh! A letter filled with love! ✨", 3500);
     book.classList.add("is-open");
     page.classList.remove("hidden");
     openButton.classList.add("hidden");
     closeButton.classList.remove("hidden");
-    completeButton.classList.remove("hidden");
-
-    if (reducedMotion) {
-      showCompleteLetter();
-      return;
-    }
-
-    timer = window.setInterval(() => {
-      cursor = Math.min(cursor + 3, letter.length);
-      typed.textContent = letter.slice(0, cursor);
-      if (cursor >= letter.length) {
-        window.clearInterval(timer);
-        completeButton.classList.add("hidden");
-      }
-    }, 18);
+    previousPageButton.classList.remove("hidden");
+    nextPageButton.classList.remove("hidden");
+    pageIndex = 0;
+    renderPage(true);
   };
 
   const closeBook = () => {
     window.clearInterval(timer);
     cursor = 0;
     typed.textContent = "";
+    typed.scrollTop = 0;
     page.classList.add("hidden");
     book.classList.remove("is-open");
     openButton.classList.remove("hidden");
     completeButton.classList.add("hidden");
+    previousPageButton.classList.add("hidden");
+    nextPageButton.classList.add("hidden");
     closeButton.classList.add("hidden");
+    pageIndicator.classList.add("hidden");
+    extraActions.classList.add("hidden");
+    memoryBook.classList.add("hidden");
+    envelopeView.classList.add("hidden");
   };
 
   openButton.addEventListener("click", openBook);
   completeButton.addEventListener("click", showCompleteLetter);
+  previousPageButton.addEventListener("click", () => {
+    if (pageIndex > 0) { pageIndex -= 1; renderPage(true); }
+  });
+  nextPageButton.addEventListener("click", () => {
+    if (pageIndex < letterPages.length - 1) { pageIndex += 1; renderPage(true); }
+  });
   closeButton.addEventListener("click", closeBook);
+  modalRoot.querySelector("#open-memory-book").addEventListener("click", () => {
+    memoryBook.classList.remove("hidden");
+    book.classList.add("hidden");
+    pageIndicator.classList.add("hidden");
+    modalRoot.querySelector(".letter-controls").classList.add("hidden");
+    extraActions.classList.add("hidden");
+    memoryIndex = 0;
+    const showMemory = (nextIndex) => {
+      memoryIndex = (nextIndex + sisterPhotos.length) % sisterPhotos.length;
+      const photo = sisterPhotos[memoryIndex];
+      letterPhoto.src = photo.src;
+      letterPhoto.alt = photo.alt;
+      letterCaption.textContent = photo.caption;
+      letterPhotoCount.textContent = `${memoryIndex + 1} / ${sisterPhotos.length}`;
+      watchLocalImage(letterPhoto, photo.file);
+    };
+    showMemory(0);
+    modalRoot.querySelector("#letter-memory-prev").onclick = () => showMemory(memoryIndex - 1);
+    modalRoot.querySelector("#letter-memory-next").onclick = () => showMemory(memoryIndex + 1);
+  });
+  modalRoot.querySelector("#open-letter-envelope").addEventListener("click", () => {
+    envelopeView.classList.remove("hidden");
+    book.classList.add("hidden");
+    pageIndicator.classList.add("hidden");
+    modalRoot.querySelector(".letter-controls").classList.add("hidden");
+    extraActions.classList.add("hidden");
+    soundManager.play("secret");
+  });
+  modalRoot.querySelectorAll("[data-return-letter]").forEach((button) => button.addEventListener("click", () => {
+    memoryBook.classList.add("hidden");
+    envelopeView.classList.add("hidden");
+    book.classList.remove("hidden");
+    pageIndicator.classList.remove("hidden");
+    modalRoot.querySelector(".letter-controls").classList.remove("hidden");
+    showExtraActions();
+  }));
   modalCleanup = () => window.clearInterval(timer);
 }
 
@@ -2963,24 +3960,103 @@ function renderLetter() {
 // =========================================================================
 function renderFinal() {
   modalShell(`
-    <div class="final-scene">
-      <p class="modal-eyebrow">A little piece of magic, made with love</p>
-      <span class="heart-crystal" aria-hidden="true">♥</span>
-      <p class="final-first-line">Every magical kingdom needs a princess...</p>
-      <h2 class="final-name">...and this one belongs to YOU, YUNISHA. 👑❤️</h2>
-      <p class="final-subtitle np">शुभ दशैं, मेरी प्यारी युनिशा!</p>
-      <p class="final-message">
-        <span class="final-signoff-intro">Lots of love,</span>
-        <strong class="final-signoff-name">Your Didi 💗</strong>
-      </p>
-      <div class="row centered-action" style="margin-top:24px;">
-        <button class="button button-gold" id="replay-button" type="button">Replay the experience ↺</button>
-        <button class="secondary-button" id="return-kingdom" type="button">Return to the kingdom 🏰</button>
+    <div class="final-adventure" id="final-adventure">
+      <p class="modal-eyebrow">A tiny adventure just for you ✨</p>
+      <h2>A Final Little Surprise</h2>
+      <div class="final-gift-stage" id="final-gift-stage">
+        <span class="final-gift-sparkles" aria-hidden="true">✦　✧　✦</span>
+        <button class="final-golden-gift" id="final-golden-gift" type="button" aria-label="Open the mysterious golden gift">🎁</button>
+        <p id="final-invitation">A mysterious golden gift is waiting. Tap it to discover its magic!</p>
       </div>
+      <section class="final-spell-section hidden" id="final-spell-section" aria-labelledby="final-spell-title">
+        <h3 id="final-spell-title">Choose three little spells</h3>
+        <p class="small-note">Tap each spell once to wake the surprise.</p>
+        <div class="final-spell-choices" role="group" aria-label="Final surprise spells">
+          <button class="final-spell-card" type="button" data-final-spell="kindness"><span>🌸</span><strong>Kindness</strong></button>
+          <button class="final-spell-card" type="button" data-final-spell="love"><span>💗</span><strong>Love</strong></button>
+          <button class="final-spell-card" type="button" data-final-spell="dreams"><span>⭐</span><strong>Dreams</strong></button>
+        </div>
+        <p id="final-spell-feedback" class="compliment" aria-live="polite">Spells awakened: 0 / 3</p>
+      </section>
+      <section class="final-crown-reveal hidden" id="final-crown-reveal" aria-live="polite">
+        <div class="final-crown" aria-hidden="true">👑</div>
+        <h3>Surprise! You are the real magic of this kingdom.</h3>
+        <p class="final-finale-line">Every magical kingdom needs a princess...</p>
+        <p class="final-name">...and this one belongs to YOU, YUNISHA. 👑❤️</p>
+        <p class="final-subtitle np">शुभ दशैं, मेरी प्यारी युनिशा!</p>
+        <p class="final-message"><span class="final-signoff-intro">Lots of love,</span> <strong class="final-signoff-name">Your Didi 💗</strong></p>
+        <div class="row centered-action final-actions">
+          <button class="button button-gold" type="button" id="wear-final-crown">Wear My Crown 👑</button>
+          <button class="secondary-button" type="button" id="stay-fairy-garden">Stay in the Fairy Garden 🦋</button>
+          <button class="pill-button" type="button" id="replay-final-surprise">Replay My Surprise ✨</button>
+          <button class="secondary-button" id="replay-button" type="button">Replay the experience ↺</button>
+          <button class="secondary-button" id="return-kingdom" type="button">Return to the kingdom 🏰</button>
+        </div>
+        <p id="final-crown-feedback" class="small-note" aria-live="polite"></p>
+      </section>
     </div>
   `, "Final Surprise for Yunisha");
 
-  soundManager.play("celebrate");
+  const spellChoices = new Set();
+  const invitation = modalRoot.querySelector("#final-invitation");
+  const giftButton = modalRoot.querySelector("#final-golden-gift");
+  const spellSection = modalRoot.querySelector("#final-spell-section");
+  const spellFeedback = modalRoot.querySelector("#final-spell-feedback");
+  const crownReveal = modalRoot.querySelector("#final-crown-reveal");
+  const spellEffects = {
+    kindness: { message: "Kindness made the garden flowers bloom! 🌸", symbols: ["🌸", "🌼", "🌷"], effect: "celebration" },
+    love: { message: "Love sent glowing hearts dancing through the garden! 💗", symbols: ["💗", "💕", "💖"], effect: "blessing" },
+    dreams: { message: "Dreams lit the sky with twinkling stars! ⭐", symbols: ["⭐", "✨", "🌟"], effect: "celebration" },
+  };
+  giftButton.addEventListener("click", () => {
+    if (!spellSection.classList.contains("hidden")) return;
+    giftButton.classList.add("is-open");
+    modalRoot.querySelector("#final-gift-stage").classList.add("final-gift-opened");
+    invitation.textContent = "The ribbon twirls away—three spells are ready for you!";
+    spellSection.classList.remove("hidden");
+    soundManager.play("gift");
+    kariSpeak("A golden surprise! Choose kindness, love, and dreams to reveal its secret. ✨", 5000);
+  });
+
+  modalRoot.querySelectorAll("[data-final-spell]").forEach((button) => button.addEventListener("click", () => {
+    const spellName = button.dataset.finalSpell;
+    if (spellChoices.has(spellName)) return;
+    const spell = spellEffects[spellName];
+    if (!spell) return;
+    spellChoices.add(spellName);
+    button.classList.add("is-cast");
+    button.setAttribute("aria-pressed", "true");
+    const stage = modalRoot.querySelector("#final-gift-stage");
+    spell.symbols.forEach((symbol, index) => {
+      const particle = document.createElement("span");
+      particle.className = `final-spell-particle final-particle-${index + 1}`;
+      particle.textContent = symbol;
+      stage.appendChild(particle);
+      window.setTimeout(() => particle.remove(), 1800);
+    });
+    world?.interact(spell.effect);
+    soundManager.play("sparkle");
+    spellFeedback.textContent = `${spell.message} Spells awakened: ${spellChoices.size} / 3`;
+    if (spellChoices.size === 3) {
+      crownReveal.classList.remove("hidden");
+      crownReveal.classList.add("is-revealed");
+      modalRoot.querySelector("#final-gift-stage").classList.add("final-crown-unlocked");
+      world?.triggerCelebration();
+      soundManager.play("celebrate");
+      kariSpeak("All three spells are shining! The crown is yours, Princess Yunisha! 👑", 6000);
+    }
+  }));
+
+  modalRoot.querySelector("#wear-final-crown").addEventListener("click", () => {
+    equippedWardrobe.crown = "royal";
+    saveObject("yunisha_wardrobe", equippedWardrobe);
+    world?.setPrincessCrown("royal");
+    modalRoot.querySelector("#final-crown-feedback").textContent = "Your Golden Sovereign Crown is now worn in the kingdom! 👑";
+    soundManager.play("fanfare");
+    world?.triggerCelebration();
+  });
+  modalRoot.querySelector("#stay-fairy-garden").addEventListener("click", () => openModal("simulations"));
+  modalRoot.querySelector("#replay-final-surprise").addEventListener("click", () => renderFinal());
   modalRoot.querySelector("#replay-button").addEventListener("click", goHome);
   modalRoot.querySelector("#return-kingdom").addEventListener("click", () => {
     closeModal();
@@ -3487,8 +4563,6 @@ document.getElementById("home-button").addEventListener("click", () => {
 document.querySelector(".wordmark").addEventListener("click", (event) => { event.preventDefault(); goHome(); });
 
 const soundToggle = document.getElementById("sound-toggle");
-const ambienceToggle = document.getElementById("ambience-toggle");
-
 soundToggle.addEventListener("click", async () => {
   try {
     const enabled = await soundManager.setEffectsEnabled(!soundManager.effectsEnabled);
@@ -3499,19 +4573,6 @@ soundToggle.addEventListener("click", async () => {
   } catch (error) {
     console.error("Could not enable sound effects.", error);
     announce("Sound effects are not supported by this browser.");
-  }
-});
-
-ambienceToggle.addEventListener("click", async () => {
-  try {
-    const enabled = await soundManager.setAmbienceEnabled(!soundManager.ambienceEnabled);
-    ambienceToggle.setAttribute("aria-pressed", String(enabled));
-    ambienceToggle.title = enabled ? "Turn ambience off" : "Turn ambience on";
-    ambienceToggle.innerHTML = `♪ <span>Ambience ${enabled ? "on" : "off"}</span>`;
-    announce(enabled ? "Soft synthesized ambience is on." : "Ambience is off.");
-  } catch (error) {
-    console.error("Could not enable ambience.", error);
-    announce("Ambience is not supported by this browser.");
   }
 });
 
@@ -3650,21 +4711,24 @@ function updateControlsVisibility() {
   const inKingdom = !kingdom.classList.contains("hidden");
   const hasModal = Boolean(modalRoot.firstElementChild);
   const touch = isTouchDevice();
+  const showAdventureHud = inKingdom && !hasModal && (!touch || isAdventureMode);
+
+  if (!inKingdom || hasModal || !isAdventureMode) resetTouchMovement();
 
   if (exploreHintEl) {
     exploreHintEl.textContent = touch ? MOBILE_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;
   }
 
   if (mobileControlsEl) {
-    mobileControlsEl.classList.toggle("hidden", !(inKingdom && !hasModal && touch));
+    mobileControlsEl.classList.toggle("hidden", !(inKingdom && !hasModal && touch && isAdventureMode));
   }
 
   if (objectiveBeaconEl) {
-    objectiveBeaconEl.classList.toggle("hidden", !(inKingdom && !hasModal));
+    objectiveBeaconEl.classList.toggle("hidden", !showAdventureHud);
   }
 
   if (questGuidePanelEl) {
-    questGuidePanelEl.classList.toggle("hidden", !(inKingdom && !hasModal));
+    questGuidePanelEl.classList.toggle("hidden", !showAdventureHud);
   }
 
   const btnReturnWelcome = document.getElementById("btn-return-welcome");
@@ -3682,6 +4746,30 @@ function getNearestObjective() {
   const theme = activeWorldTheme;
   const princessPos = world?.getPrincessPosition() || { x: 0, z: 0 };
   const currentQuest = getActiveQuest();
+
+  if (currentQuest.id === "fairy_kingdom" && !fairyQuestProgress.completed) {
+    if (fairyQuestProgress.crystals.size < 3) {
+      const hiddenCrystals = (world?.getFairyCrystalsList?.() || []).filter((crystal) => !fairyQuestProgress.crystals.has(crystal.id));
+      hiddenCrystals.sort((a, b) => Math.hypot(a.x - princessPos.x, a.z - princessPos.z) - Math.hypot(b.x - princessPos.x, b.z - princessPos.z));
+      if (hiddenCrystals.length) {
+        const nextCrystal = hiddenCrystals[0];
+        return {
+          id: nextCrystal.id,
+          x: nextCrystal.x,
+          z: nextCrystal.z,
+          title: `${nextCrystal.title} 💎`,
+          hint: `${nextCrystal.title} is glowing in the garden. Walk close and tap Discover Crystal.`,
+        };
+      }
+    }
+    return {
+      id: "simulations",
+      x: -8,
+      z: 2,
+      title: "Lost Fairy Kingdom 🧚",
+      hint: currentQuest.hint,
+    };
+  }
 
   // 1. If currently tracking Quest 3 (The Missing Falling Stars)
   if (currentQuest.id === "quest_3" && collectedStars.size < 3) {
@@ -3905,6 +4993,16 @@ function hideTutorialModal() {
 }
 
 let joystickPointerId = null;
+let runPointerId = null;
+
+function resetTouchMovement() {
+  joystickPointerId = null;
+  runPointerId = null;
+  if (joystickKnobEl) joystickKnobEl.style.transform = "translate(0, 0)";
+  mobileRunBtn?.classList.remove("is-running");
+  world?.setJoystick(0, 0);
+  world?.setRunning(false);
+}
 
 function setupVirtualJoystick() {
   if (!joystickBaseEl || !joystickKnobEl) return;
@@ -3943,6 +5041,7 @@ function setupVirtualJoystick() {
 
   joystickBaseEl.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    if (joystickPointerId !== null) return;
     joystickPointerId = e.pointerId;
     joystickBaseEl.setPointerCapture?.(e.pointerId);
     handleJoystickMove(e);
@@ -3951,24 +5050,25 @@ function setupVirtualJoystick() {
   window.addEventListener("pointermove", handleJoystickMove);
   window.addEventListener("pointerup", handleJoystickUp);
   window.addEventListener("pointercancel", handleJoystickUp);
+  window.addEventListener("lostpointercapture", handleJoystickUp);
 }
 
 function setupMobileControls() {
   setupVirtualJoystick();
 
   if (mobileRunBtn) {
-    let isRunning = false;
     const startRun = (e) => {
       e.preventDefault();
+      if (runPointerId !== null) return;
+      runPointerId = e.pointerId;
       if (!isAdventureMode) setAdventureMode(true);
-      isRunning = true;
       world?.setRunning(true);
       mobileRunBtn.classList.add("is-running");
     };
     const endRun = (e) => {
-      e.preventDefault();
-      if (isRunning) {
-        isRunning = false;
+      if (runPointerId === e.pointerId) {
+        e.preventDefault();
+        runPointerId = null;
         world?.setRunning(false);
         mobileRunBtn.classList.remove("is-running");
       }
@@ -3976,6 +5076,7 @@ function setupMobileControls() {
     mobileRunBtn.addEventListener("pointerdown", startRun);
     window.addEventListener("pointerup", endRun);
     window.addEventListener("pointercancel", endRun);
+    window.addEventListener("lostpointercapture", endRun);
   }
 
   if (mobileJumpBtn) {
@@ -4066,6 +5167,12 @@ function setupMobileControls() {
   }
 
   window.addEventListener("resize", updateControlsVisibility);
+  window.addEventListener("blur", resetTouchMovement);
+  window.addEventListener("pagehide", resetTouchMovement);
+  window.addEventListener("orientationchange", resetTouchMovement);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) resetTouchMovement();
+  });
 
   setInterval(() => {
     if (!kingdom.classList.contains("hidden") && !modalRoot.firstElementChild) {
@@ -4102,12 +5209,15 @@ import("./world.js").then(({ createWorld }) => {
   window.showRestartConfirmationDialog = showRestartConfirmationDialog;
   window.restartAdventureProgress = restartAdventureProgress;
   world.setReducedMotion(reducedMotion);
+  world.setAdventureMode(isAdventureMode);
   if (activeWorldTheme !== "FAIRY_WORLD") world.setTheme(activeWorldTheme);
   if (portalEntered) world.enterPortal();
 
   // Restore already collected treasures & stars in 3D scene
   foundTreasures.forEach((id) => world.collectTreasure(id));
   collectedStars.forEach((id) => world.collectQuestStar(id));
+  fairyQuestProgress.crystals.forEach((id) => world.collectFairyCrystal(id));
+  world.setFairyRainbowRestored(fairyQuestProgress.rainbowRestored);
   litDiyas.forEach((id) => world.lightDiya(id));
   placedMarigolds.forEach((id) => world.placeMarigold(id));
 
@@ -4123,12 +5233,14 @@ import("./world.js").then(({ createWorld }) => {
     const inKingdom = !kingdom.classList.contains("hidden");
     const noModal = !modalRoot.firstElementChild;
     if (data && inKingdom && noModal) {
-      worldPrompt.classList.remove("hidden");
+      worldPrompt.classList.toggle("hidden", isTouchDevice());
       worldPromptText.textContent = `Press E or tap to explore: ${data.title}`;
-      if (mobileInteractBtn) {
+      if (mobileInteractBtn && isTouchDevice() && isAdventureMode) {
         mobileInteractBtn.classList.remove("hidden");
         mobileInteractLabel.textContent = data.actionLabel || data.title;
         mobileInteractIcon.textContent = data.icon || "✨";
+      } else {
+        mobileInteractBtn?.classList.add("hidden");
       }
     } else {
       worldPrompt?.classList.add("hidden");
